@@ -6,7 +6,7 @@ import type { CandidateProfile } from '@schemas/candidate';
 import { DEFAULT_AUTOFILL_SETTINGS, type AutofillSettings } from '@schemas/application';
 import { refreshRegistry, getRegistry } from '../../extension/src/content/fieldRegistry';
 import { buildFillPlan, type PlannerHooks, type FillPlan } from '../../extension/src/intelligence/fillPlanner';
-import { executeFillPlan, clearFillMarks } from '../../extension/src/content/formFiller';
+import { executeFillPlan, clearFillMarks, applyUserEdit } from '../../extension/src/content/formFiller';
 
 const FIXTURES_DIR = path.resolve(__dirname, '../fixtures');
 
@@ -219,6 +219,37 @@ describe('executeFillPlan radio groups', () => {
 
     const filled = result.fields.find((f) => f.semanticField === 'remote_preference');
     expect(filled?.status).toBe('needs_review');
+  });
+});
+
+describe('applyUserEdit', () => {
+  beforeEach(() => loadFixture('simple.html'));
+
+  it('fills a user-confirmed value and records it as a user edit', async () => {
+    const plan = await planFor(makeProfile());
+    const action = plan.actions.find((a) => a.semanticField === 'why_company');
+    expect(action).toBeDefined();
+
+    const record = applyUserEdit(action!, 'I admire Acme’s tooling focus.');
+
+    expect(record.status).toBe('success');
+    expect(record.method).toBe('user');
+    expect(record.value).toBe('I admire Acme’s tooling focus.');
+
+    const textarea = inputByLabel('why do you want') as HTMLTextAreaElement;
+    expect(textarea.value).toBe('I admire Acme’s tooling focus.');
+    expect(textarea.getAttribute('data-ua-highlight')).toBe('filled');
+  });
+
+  it('fails cleanly when the element is gone', async () => {
+    const plan = await planFor(makeProfile());
+    const action = plan.actions.find((a) => a.semanticField === 'why_company');
+    document.body.innerHTML = '';
+    refreshRegistry();
+
+    const record = applyUserEdit(action!, 'anything');
+    expect(record.status).toBe('failed');
+    expect(record.error).toContain('not found');
   });
 });
 

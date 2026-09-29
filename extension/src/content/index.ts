@@ -1,14 +1,93 @@
-import type { FormAnalysis } from '@schemas/dom';
-import { registerHandlers } from '../utils/messaging';
+import type { FormAnalysis, FieldCategory, JobContext } from '@schemas/dom';
+import type { AutofillResult, FilledField } from '@schemas/application';
+import type { FieldClassificationInput, FieldClassificationOutput } from '@schemas/ai';
+import { registerHandlers, sendMessage } from '../utils/messaging';
 import { createLogger, setDebugMode } from '../utils/logger';
 import { analyzeForm } from './semanticExtractor';
 import { refreshRegistry, getRegistry } from './fieldRegistry';
 import { observeFormChanges, stopObserving } from './mutationObserver';
+import {
+  buildFillPlan,
+  type FillPlan,
+  type PlannerHooks,
+} from '../intelligence/fillPlanner';
+import { executeFillPlan, applyUserEdit, type FileToUpload } from './formFiller';
+import type { Classification } from '../intelligence/fieldClassifier';
+import * as candidateStore from '../storage/candidateStore';
+import * as settingsStore from '../storage/settingsStore';
 
 const log = createLogger('content');
 
 let lastAnalysis: FormAnalysis | null = null;
+let lastPlan: FillPlan | null = null;
 let observing = false;
+
+type ClassifyRequest = {
+  field: FieldClassificationInput['field'];
+  jobContext?: JobContext;
+};
+
+function slimField(field: {
+  label?: string;
+  placeholder?: string;
+  name?: string;
+  type?: string;
+  options?: string[];
+  surroundingText?: string;
+  section?: string;
+}): FieldClassificationInput['field'] {
+  return {
+    label: field.label,
+    placeholder: field.placeholder,
+    name: field.name,
+    type: field.type,
+    options: field.options,
+    surroundingText: field.surroundingText,
+    section: field.section,
+  };
+}
+
+function createAiHooks(): PlannerHooks {
+  return {
+    async classifyWithAI(field): Promise<Classification | null> {
+      try {
+        const request: ClassifyRequest = {
+          field: slimField(field),
+          ...(lastAnalysis?.jobContext ? { jobContext: lastAnalysis.jobContext } : {}),
+        };
+        const out = await sendMessage<ClassifyRequest, FieldClassificationOutput | null>(
+          'ai-classify',
+          request
+        );
+        if (!out) return null;
+        return {
+          semanticField: out.semanticField,
+          category: out.category as FieldCategory,
+          confidence: out.confidence,
+          method: 'ai',
+          reason: out.reason,
+        };
+      } catch {
+        return null;
+      }
+    },
+    async generateAnswer({ question, semanticField, category }) {
+      try {
+        return await sendMessage<
+          { question: string; semanticField: string; category: string; jobContext?: JobContext },
+          { answer: string; confidence: number } | null
+        >('ai-answer', {
+          question,
+          semanticField,
+          category,
+          jobContext: lastAnalysis?.jobContext ?? undefined,
+        });
+      } catch {
+        return null;
+      }
+    },
+  };
+}
 
 registerHandlers({
   async 'content-ping'() {
@@ -36,6 +115,7 @@ registerHandlers({
     const fields = refreshRegistry();
     const analysis = analyzeForm();
     lastAnalysis = analysis;
+    lastPlan = null;
     return { analysis, fields };
   },
 
@@ -48,6 +128,45 @@ registerHandlers({
   async 'set-debug'(payload: { enabled: boolean }) {
     setDebugMode(payload.enabled);
     return { enabled: payload.enabled };
+  },
+
+  async 'build-fill-plan'(): Promise<FillPlan> {
+    const profile = await candidateStore.getCandidateProfile();
+    const settings = await settingsStore.getSettings();
+    refreshRegistry();
+    const fields = getRegistry().map((entry) => entry.field);
+    lastPlan = await buildFillPlan(fields, profile, settings, createAiHooks());
+    log.info('fill plan built', lastPlan.summary);
+    return lastPlan;
+  },
+
+  async 'get-last-plan'(): Promise<FillPlan | null> {
+    return lastPlan;
+  },
+
+  async 'execute-fill'(payload?: { resumeFile?: FileToUpload }): Promise<AutofillResult> {
+    if (!lastPlan) {
+      throw new Error('no fill plan available; build one first');
+    }
+    const result = executeFillPlan(lastPlan, payload ?? {});
+    log.info('fill executed', {
+      filled: result.filledCount,
+      failed: result.failedCount,
+      needsReview: result.needsReviewCount,
+    });
+    return result;
+  },
+
+  async 'apply-review-edit'(payload: { fieldId: string; value: string }): Promise<FilledField> {
+    if (!lastPlan) throw new Error('no fill plan available; build one first');
+    const action = lastPlan.actions.find((a) => a.fieldId === payload.fieldId);
+    if (!action) throw new Error(`unknown field ${payload.fieldId}`);
+    const result = applyUserEdit(action, payload.value);
+    if (result.status === 'success') {
+      action.value = payload.value;
+      action.decision = 'auto_fill';
+    }
+    return result;
   },
 });
 

@@ -237,6 +237,27 @@ function record(
   };
 }
 
+export function applyUserEdit(action: PlannedFill, value: string): FilledField {
+  ensureStyles();
+  const entry = resolveEntry(action);
+  if (!entry) {
+    const error = 'field element not found (page may have changed)';
+    log.warn('user edit failed', { field: action.semanticField, error });
+    return record(action, 'failed', error);
+  }
+
+  const modified: PlannedFill = { ...action, value, decision: 'auto_fill' };
+  try {
+    applyFill(modified, entry, {});
+    entry.element.setAttribute('data-ua-highlight', 'filled');
+    return { ...record(modified, 'success'), method: 'user' };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    log.warn('user edit failed', { field: action.semanticField, error });
+    return record(action, 'failed', error);
+  }
+}
+
 export function executeFillPlan(plan: FillPlan, options: ExecuteOptions = {}): AutofillResult {
   ensureStyles();
 
