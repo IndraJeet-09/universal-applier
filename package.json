@@ -12,11 +12,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
+    "pdfjs-dist": "^4.2.67",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "zod": "^3.22.4",
-    "pdfjs-dist": "^4.2.67",
-    "mammoth": "^1.6.0"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.258",
