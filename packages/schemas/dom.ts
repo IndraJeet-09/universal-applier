@@ -8,6 +8,7 @@ export interface SemanticField {
   name?: string;
   type?: string;
   role?: string;
+  autocomplete?: string;
   ariaLabel?: string;
   description?: string;
   surroundingText?: string;
