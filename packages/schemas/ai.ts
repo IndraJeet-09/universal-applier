@@ -20,6 +20,11 @@ export interface FieldClassificationInput {
     experience?: Array<{ title: string; company: string }>;
     education?: Array<{ degree: string; institution: string }>;
   };
+  knownFields?: string[];
+  jobContext?: {
+    title?: string;
+    company?: string;
+  };
 }
 
 export interface FieldClassificationOutput {
