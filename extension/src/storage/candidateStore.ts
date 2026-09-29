@@ -1,4 +1,5 @@
-import type { CandidateProfile, EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
+import type { CandidateProfile } from '@schemas/candidate';
+import { EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
 
 const CANDIDATE_KEY = 'candidate_profile';
 const STORAGE_VERSION = 1;
@@ -30,7 +31,7 @@ export async function setCandidateProfile(profile: CandidateProfile): Promise<vo
 
 export async function updateCandidateProfile(updates: Partial<CandidateProfile>): Promise<CandidateProfile> {
   const current = await getCandidateProfile();
-  const merged = deepMerge(current, updates);
+  const merged = deepMerge(current, updates) as CandidateProfile;
   await setCandidateProfile(merged);
   return merged;
 }
@@ -39,22 +40,17 @@ export async function clearCandidateProfile(): Promise<void> {
   await chrome.storage.local.remove(CANDIDATE_KEY);
 }
 
-function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...target };
+function deepMerge(target: unknown, source: unknown): unknown {
+  if (!isPlainObject(target) || !isPlainObject(source)) return source;
+  const result: Record<string, unknown> = { ...target };
   for (const key of Object.keys(source)) {
-    const sourceValue = source[key];
-    const targetValue = target[key];
-    if (isObject(sourceValue) && isObject(targetValue)) {
-      result[key] = deepMerge(targetValue as Record<string, unknown>, sourceValue as Record<string, unknown>);
-    } else {
-      result[key] = sourceValue;
-    }
+    result[key] = key in result ? deepMerge(result[key], source[key]) : source[key];
   }
   return result;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function addApplicationAnswer(

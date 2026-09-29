@@ -1,5 +1,9 @@
-import type { SemanticField, FormSection, FormAnalysis, FieldFingerprint } from '@schemas/dom';
+import type { SemanticField, FormSection, FormAnalysis } from '@schemas/dom';
 import { computeFingerprint } from '@schemas/dom';
+import { registerHandlers } from '../utils/messaging';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('content');
 
 const FIELD_SELECTORS = [
   'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
@@ -59,7 +63,6 @@ function getSurroundingText(element: Element, maxLength = 200): string {
   }
   return texts.join(' | ').slice(0, maxLength);
 }
-
 function getSectionHeading(element: Element): string | null {
   let current: Element | null = element.parentElement;
   while (current) {
@@ -122,7 +125,8 @@ export function scanDOM(): SemanticField[] {
       const inputElement = element as HTMLInputElement;
       if (SKIP_TYPES.includes(inputElement.type || '')) continue;
 
-      const label = getAssociatedLabel(htmlElement) || htmlElement.getAttribute('aria-label') || undefined;
+      const label: string | undefined =
+        getAssociatedLabel(htmlElement) ?? htmlElement.getAttribute('aria-label') ?? undefined;
       const placeholder = htmlElement.getAttribute('placeholder') || undefined;
       const name = htmlElement.getAttribute('name') || undefined;
       const type = getElementType(element);
@@ -138,7 +142,7 @@ export function scanDOM(): SemanticField[] {
       const disabled = htmlElement.hasAttribute('disabled') || htmlElement.getAttribute('aria-disabled') === 'true';
       const options = (element as HTMLSelectElement).options ? extractOptions(element as HTMLSelectElement) : undefined;
       const surroundingText = getSurroundingText(element);
-      const section = getSectionHeading(element);
+      const section = getSectionHeading(element) ?? undefined;
 
       const field: SemanticField = {
         id: `field-${crypto.randomUUID()}`,
@@ -174,23 +178,24 @@ function getSelector(element: Element): string {
   const path: string[] = [];
   let current: Element | null = element;
   while (current && current !== document.body) {
-    let selector = current.tagName.toLowerCase();
-    if (current.id) {
-      selector += `#${current.id}`;
+    const node: Element = current;
+    let selector = node.tagName.toLowerCase();
+    if (node.id) {
+      selector += `#${node.id}`;
       path.unshift(selector);
       break;
     }
-    if (current.className) {
-      const classes = current.className.split(' ').filter(c => c && !c.startsWith('_')).slice(0, 2);
+    if (node.className) {
+      const classes = node.className.split(' ').filter(c => c && !c.startsWith('_')).slice(0, 2);
       if (classes.length > 0) {
         selector += `.${classes.join('.')}`;
       }
     }
-    const parent = current.parentElement;
+    const parent: Element | null = node.parentElement;
     if (parent) {
-      const siblings = Array.from(parent.children).filter(el => el.tagName === current.tagName);
+      const siblings = Array.from(parent.children).filter(el => el.tagName === node.tagName);
       if (siblings.length > 1) {
-        const index = siblings.indexOf(current) + 1;
+        const index = siblings.indexOf(node) + 1;
         selector += `:nth-of-type(${index})`;
       }
     }
@@ -314,18 +319,16 @@ export function stopObserving(): void {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'scan-fields') {
-    const fields = getAllFields();
-    sendResponse({ fields });
-    return true;
-  }
-  if (message.type === 'analyze-form') {
-    const analysis = analyzeForm();
-    sendResponse({ analysis });
-    return true;
-  }
-  return false;
+registerHandlers({
+  async 'content-ping'() {
+    return { hasContentScript: true };
+  },
+  async 'scan-fields'() {
+    return { fields: getAllFields() };
+  },
+  async 'analyze-form'() {
+    return analyzeForm();
+  },
 });
 
-console.log('Content script loaded');
+log.info('content script loaded', { url: window.location.href });

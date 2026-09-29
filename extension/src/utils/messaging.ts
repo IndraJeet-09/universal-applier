@@ -55,15 +55,23 @@ export function sendMessage<TReq, TRes>(
   });
 }
 
-type MessageHandler = (payload: unknown, sender: chrome.runtime.MessageSender) => Promise<unknown> | unknown;
+type MessageHandler = (
+  payload: never,
+  sender: chrome.runtime.MessageSender
+) => Promise<unknown> | unknown;
 
 export function registerHandlers(handlers: Record<string, MessageHandler>): void {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const envelope = message as MessageEnvelope;
     if (!envelope || typeof envelope.type !== 'string') return false;
 
-    const handler = handlers[envelope.type];
-    if (!handler) return false;
+    const rawHandler = handlers[envelope.type];
+    if (!rawHandler) return false;
+
+    const handler = rawHandler as unknown as (
+      payload: unknown,
+      sender: chrome.runtime.MessageSender
+    ) => Promise<unknown> | unknown;
 
     Promise.resolve()
       .then(() => handler(envelope.payload, sender))

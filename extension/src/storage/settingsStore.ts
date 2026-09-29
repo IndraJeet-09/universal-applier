@@ -1,4 +1,6 @@
-import type { AutofillSettings, DEFAULT_AUTOFILL_SETTINGS, AIConfig } from '@schemas/application';
+import type { AutofillSettings } from '@schemas/application';
+import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
+import type { AIConfig } from '@schemas/ai';
 
 const SETTINGS_KEY = 'autofill_settings';
 const AI_CONFIG_KEY = 'ai_config';
@@ -6,7 +8,7 @@ const AI_CONFIG_KEY = 'ai_config';
 export async function getSettings(): Promise<AutofillSettings> {
   try {
     const result = await chrome.storage.sync.get(SETTINGS_KEY);
-    return result[SETTINGS_KEY] || DEFAULT_AUTOFILL_SETTINGS;
+    return { ...DEFAULT_AUTOFILL_SETTINGS, ...(result[SETTINGS_KEY] ?? {}) };
   } catch {
     return DEFAULT_AUTOFILL_SETTINGS;
   }
@@ -22,7 +24,7 @@ export async function setSettings(settings: Partial<AutofillSettings>): Promise<
 export async function getAIConfig(): Promise<AIConfig | null> {
   try {
     const result = await chrome.storage.sync.get(AI_CONFIG_KEY);
-    return result[AI_CONFIG_KEY] || null;
+    return result[AI_CONFIG_KEY] ?? null;
   } catch {
     return null;
   }

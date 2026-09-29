@@ -1,3 +1,5 @@
+import type { FormAnalysis, JobContext } from './dom';
+
 export interface ApplicationSession {
   id: string;
   url: string;
