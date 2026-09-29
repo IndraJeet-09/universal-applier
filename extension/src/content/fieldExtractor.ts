@@ -51,8 +51,9 @@ function getAriaDescription(element: Element): string | undefined {
 
 function looksLikeLabelText(text: string): boolean {
   if (text.length === 0 || text.length > 120) return false;
-  if (/[.!?]$/.test(text)) return false;
+  if (/[.]$/.test(text)) return false;
   if (/[·|•]/.test(text)) return false;
+  if (text.split('\n').length > 2) return false;
   return /[a-zA-Z]/.test(text);
 }
 

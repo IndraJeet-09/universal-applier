@@ -1,5 +1,5 @@
 import type { CandidateProfile, ApplicationAnswer } from '@schemas/candidate';
-import { isSensitiveKey } from './taxonomy';
+import { isSensitiveKey, SYNONYMS, normalizeText } from './taxonomy';
 
 export type ValueSource = 'profile' | 'saved_answer' | 'none';
 
@@ -66,8 +66,22 @@ export function findSavedAnswer(
   return best?.answer ?? null;
 }
 
+function findAnswerByFieldKey(field: string, answers: ApplicationAnswer[]): ApplicationAnswer | null {
+  const aliases = (SYNONYMS[field] ?? [])
+    .map((alias) => normalizeText(alias))
+    .filter((alias) => alias.length >= 5);
+  if (aliases.length === 0) return null;
+  for (const answer of answers) {
+    const question = normalizeText(answer.question);
+    if (aliases.some((alias) => question.includes(alias))) return answer;
+  }
+  return null;
+}
+
 function resolveFromSavedAnswers(field: string, profile: CandidateProfile, contextText: string): MatchResult | null {
-  const answer = findSavedAnswer(contextText, profile.applicationAnswers);
+  const answers = profile.applicationAnswers;
+  if (!answers || answers.length === 0) return null;
+  const answer = (contextText ? findSavedAnswer(contextText, answers) : null) ?? findAnswerByFieldKey(field, answers);
   if (answer) {
     return {
       semanticField: field,

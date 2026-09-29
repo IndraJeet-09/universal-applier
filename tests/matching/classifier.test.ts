@@ -34,10 +34,15 @@ function findBy(finder: (f: SemanticField) => boolean, fields = scanFields()): S
 
 function expectField(labelFragment: string, expectedField: string, minConfidence = 0.7): void {
   const fields = scanFields();
-  const field = findBy(
-    (f) => (f.label ?? '').toLowerCase().includes(labelFragment.toLowerCase()),
-    fields
-  );
+  const fragment = labelFragment.toLowerCase();
+  const haystack = (f: SemanticField): string =>
+    [f.label, f.ariaLabel, f.placeholder, f.description]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+  const field =
+    fields.find((f) => haystack(f).includes(fragment)) ??
+    findBy((f) => (f.surroundingText ?? '').toLowerCase().includes(fragment), fields);
   const result = classifyField(field);
   expect(result.semanticField, `label "${field.label}"`).toBe(expectedField);
   expect(result.confidence, `label "${field.label}" confidence`).toBeGreaterThanOrEqual(minConfidence);

@@ -47,6 +47,7 @@ interface HeuristicRule {
   pattern: RegExp;
   confidence: number;
   reason: string;
+  labelOnly?: boolean;
 }
 
 const HEURISTIC_RULES: HeuristicRule[] = [
@@ -75,6 +76,7 @@ const HEURISTIC_RULES: HeuristicRule[] = [
   { field: 'portfolio', pattern: /\bportfolio\b|personal\s+website|personal\s+site|your\s+website|online\s+portfolio/i, confidence: 0.85, reason: 'asks for portfolio' },
   { field: 'terms_acceptance', pattern: /i\s+(certify|agree|acknowledge|confirm)\b|terms\s+(of\s+service|and\s+conditions|of\s+use)|privacy\s+policy/i, confidence: 0.9, reason: 'legal acceptance statement' },
   { field: 'pronouns', pattern: /pronoun/i, confidence: 0.95, reason: 'asks for pronouns' },
+  { field: 'country', pattern: /\bcountry\b|\bnation\b/i, confidence: 0.9, reason: 'asks for country', labelOnly: true },
 ];
 
 interface SynonymIndexEntry {
@@ -189,7 +191,6 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 function classifyBySynonyms(
-  field: SemanticField,
   source: 'label' | 'name' | 'placeholder' | 'surrounding',
   text: string
 ): Classification | null {
@@ -197,6 +198,8 @@ function classifyBySynonyms(
   if (normalized.length === 0) return null;
 
   const sourcePenalty = source === 'label' ? 0 : source === 'surrounding' ? 0.12 : 0.06;
+  let bestIdx = -1;
+  let bestEntry: SynonymIndexEntry | null = null;
 
   for (const entry of SYNONYM_INDEX) {
     if (entry.synonym.length < 3) continue;
@@ -208,9 +211,15 @@ function classifyBySynonyms(
 
   for (const entry of SYNONYM_INDEX) {
     if (entry.synonym.length < 4) continue;
-    if (containsPhrase(normalized, entry.synonym)) {
-      return withField(entry.key, clamp(0.9 - sourcePenalty), 'phrase_contained', `${source} contains "${entry.synonym}"`);
+    const idx = indexOfPhrase(normalized, entry.synonym);
+    if (idx === -1) continue;
+    if (bestIdx === -1 || idx < bestIdx) {
+      bestIdx = idx;
+      bestEntry = entry;
     }
+  }
+  if (bestEntry) {
+    return withField(bestEntry.key, clamp(0.9 - sourcePenalty), 'phrase_contained', `${source} contains "${bestEntry.synonym}"`);
   }
 
   const labelWords = words(normalized);
@@ -229,13 +238,13 @@ function classifyBySynonyms(
   return null;
 }
 
-function containsPhrase(text: string, phrase: string): boolean {
+function indexOfPhrase(text: string, phrase: string): number {
   const idx = text.indexOf(phrase);
-  if (idx === -1) return false;
+  if (idx === -1) return -1;
   const before = idx === 0 ? ' ' : text[idx - 1];
   const afterIdx = idx + phrase.length;
   const after = afterIdx >= text.length ? ' ' : text[afterIdx];
-  return /\s/.test(before) && /\s/.test(after);
+  return /\s/.test(before) && /\s/.test(after) ? idx : -1;
 }
 
 function clamp(value: number): number {
@@ -248,11 +257,17 @@ function primaryText(field: SemanticField): string {
     .join(' ');
 }
 
+function labelishText(field: SemanticField): string {
+  return [field.label, field.ariaLabel, field.description].filter(Boolean).join(' ');
+}
+
 function classifyByPrimaryHeuristics(field: SemanticField): Classification | null {
-  const text = primaryText(field);
-  if (!text) return null;
+  const fullText = primaryText(field);
+  const labelText = labelishText(field);
+  if (!fullText && !labelText) return null;
   for (const rule of HEURISTIC_RULES) {
-    if (rule.pattern.test(text)) {
+    const text = rule.labelOnly ? labelText : fullText;
+    if (text && rule.pattern.test(text)) {
       return withField(rule.field, rule.confidence, 'heuristic', rule.reason);
     }
   }
@@ -265,6 +280,7 @@ function classifyBySurroundingHeuristics(field: SemanticField): Classification |
   const context = [text, field.surroundingText].filter(Boolean).join(' ');
   if (!context) return null;
   for (const rule of HEURISTIC_RULES) {
+    if (rule.labelOnly) continue;
     if (rule.pattern.test(context)) {
       return withField(rule.field, rule.confidence - 0.05, 'heuristic', `${rule.reason} (via surrounding text)`);
     }
@@ -295,10 +311,10 @@ export function classifyField(field: SemanticField): Classification {
   const primaryStrategies: Array<() => Classification | null> = [
     () => classifyByTypeContext(field),
     () => classifyByAutocomplete(field),
-    () => (field.label ? classifyBySynonyms(field, 'label', field.label) : null),
+    () => (field.label ? classifyBySynonyms('label', field.label) : null),
     () => classifyByPrimaryHeuristics(field),
-    () => (field.name ? classifyBySynonyms(field, 'name', field.name) : null),
-    () => (field.placeholder ? classifyBySynonyms(field, 'placeholder', field.placeholder) : null),
+    () => (field.name ? classifyBySynonyms('name', field.name) : null),
+    () => (field.placeholder ? classifyBySynonyms('placeholder', field.placeholder) : null),
   ];
 
   let best = runStrategies(primaryStrategies);
@@ -306,7 +322,10 @@ export function classifyField(field: SemanticField): Classification {
 
   const contextStrategies: Array<() => Classification | null> = [
     () => classifyBySurroundingHeuristics(field),
-    () => (field.surroundingText ? classifyBySynonyms(field, 'surrounding', field.surroundingText) : null),
+    () =>
+      field.surroundingText && !field.label && !field.placeholder && !field.ariaLabel && !field.description
+        ? classifyBySynonyms('surrounding', field.surroundingText)
+        : null,
     () => classifyBySectionContext(field),
   ];
 
