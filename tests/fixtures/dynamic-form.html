@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dynamic Application Form</title>
+</head>
+<body>
+  <h1>Data Scientist Application</h1>
+
+  <form id="dynamic-form">
+    <label for="dyn-name">Full Name</label>
+    <input type="text" id="dyn-name" name="full_name" />
+
+    <label for="dyn-email">Email</label>
+    <input type="email" id="dyn-email" name="email" />
+
+    <fieldset>
+      <legend>Work Experience</legend>
+      <div id="experience-list"></div>
+      <button type="button" id="add-experience">+ Add another experience</button>
+    </fieldset>
+
+    <div id="advanced-section" hidden>
+      <label for="dyn-visa">Do you require visa sponsorship?</label>
+      <select id="dyn-visa" name="visa_sponsorship">
+        <option value="">Select…</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </div>
+  </form>
+</body>
+</html>

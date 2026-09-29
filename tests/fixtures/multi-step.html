@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Multi-step Application</title>
+</head>
+<body>
+  <div class="progress" aria-label="Step 1 of 4">Step 1 of 4 — Personal Information</div>
+
+  <form id="step-form">
+    <div class="step active" data-step="1">
+      <h2>Personal Information</h2>
+
+      <label for="ms-first">First name</label>
+      <input type="text" id="ms-first" name="first_name" />
+
+      <label for="ms-last">Last name</label>
+      <input type="text" id="ms-last" name="last_name" />
+
+      <label for="ms-email">Email</label>
+      <input type="email" id="ms-email" name="email" />
+
+      <button type="button" class="next-btn" data-next="2">Next</button>
+    </div>
+
+    <div class="step" data-step="2" style="display: none">
+      <h2>Experience &amp; Education</h2>
+
+      <label for="ms-school">University/College</label>
+      <input type="text" id="ms-school" name="school" />
+
+      <label for="ms-degree">Degree</label>
+      <input type="text" id="ms-degree" name="degree" />
+
+      <label for="ms-grad-year">Graduation year</label>
+      <input type="text" id="ms-grad-year" name="grad_year" />
+
+      <label for="ms-skills">Key skills</label>
+      <input type="text" id="ms-skills" name="skills" />
+
+      <button type="button" class="back-btn" data-back="1">Back</button>
+      <button type="button" class="next-btn" data-next="3">Next</button>
+    </div>
+
+    <div class="step" data-step="3" style="display: none">
+      <h2>Questions</h2>
+
+      <label for="ms-why">Why do you want to work here?</label>
+      <textarea id="ms-why" name="q_why" rows="4"></textarea>
+
+      <label for="ms-notice">Notice period</label>
+      <input type="text" id="ms-notice" name="notice_period" />
+
+      <button type="button" class="back-btn" data-back="2">Back</button>
+      <button type="button" class="next-btn" data-next="4">Next</button>
+    </div>
+
+    <div class="step" data-step="4" style="display: none">
+      <h2>Review &amp; Submit</h2>
+      <p>Review your application before submitting.</p>
+      <button type="button" class="back-btn" data-back="3">Back</button>
+      <button type="submit">Submit Application</button>
+    </div>
+  </form>
+</body>
+</html>
