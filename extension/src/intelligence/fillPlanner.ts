@@ -10,6 +10,7 @@ export type PlanValueSource = ValueSource | 'ai_generated';
 
 export interface PlannedFill {
   fieldId: string;
+  fingerprint: string;
   selector: string;
   kind: 'value' | 'file';
   semanticField: string;
@@ -149,6 +150,7 @@ async function planField(
 ): Promise<PlannedFill> {
   const base = {
     fieldId: field.id,
+    fingerprint: field.fingerprint,
     selector: field.selector,
     sensitive: false,
     value: null as string | null,
