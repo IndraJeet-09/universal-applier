@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CandidateProfile } from '@schemas/candidate';
 import type { FormAnalysis } from '@schemas/dom';
-import type { AutofillSettings } from '@schemas/application';
+import type { AutofillSettings, AutofillResult } from '@schemas/application';
 import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
 import { sendMessage, getActiveTab } from '../utils/messaging';
 
@@ -18,6 +18,7 @@ export default function App() {
   const [pageStatus, setPageStatus] = useState<PageStatus>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fillResult, setFillResult] = useState<AutofillResult | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -61,6 +62,7 @@ export default function App() {
     if (!pageStatus.tabId) return;
     setBusy(true);
     setError(null);
+    setFillResult(null);
     try {
       const analysis = await sendMessage<void, FormAnalysis>(
         'analyze-form',
@@ -68,6 +70,16 @@ export default function App() {
         { tabId: pageStatus.tabId }
       );
       setPageStatus((s) => ({ ...s, analysis }));
+
+      await sendMessage<void, unknown>('build-fill-plan', undefined, {
+        tabId: pageStatus.tabId,
+      });
+      const result = await sendMessage<void, AutofillResult>(
+        'execute-fill',
+        undefined,
+        { tabId: pageStatus.tabId }
+      );
+      setFillResult(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -129,6 +141,36 @@ export default function App() {
         >
           {busy ? 'Analyzing…' : 'Analyze & Autofill'}
         </button>
+
+        {fillResult && (
+          <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Filled</span>
+              <span className="font-medium text-green-700">{fillResult.filledCount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Needs review</span>
+              <span className="font-medium text-amber-600">{fillResult.needsReviewCount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Skipped</span>
+              <span className="font-medium">{fillResult.skippedCount}</span>
+            </div>
+            {fillResult.failedCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Failed</span>
+                <span className="font-medium text-red-600">{fillResult.failedCount}</span>
+              </div>
+            )}
+            {fillResult.errors.length > 0 && (
+              <ul className="text-red-600 list-disc pl-4 space-y-0.5">
+                {fillResult.errors.slice(0, 3).map((err) => (
+                  <li key={err}>{err}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {error && <div className="text-xs text-red-600">{error}</div>}
 
