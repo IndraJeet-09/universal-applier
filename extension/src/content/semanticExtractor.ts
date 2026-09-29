@@ -87,6 +87,7 @@ const JOB_KEYWORDS = [
   'education', 'linkedin', 'github', 'portfolio', 'work authorization',
   'visa', 'sponsorship', 'salary', 'notice period', 'expected ctc',
   'current employer', 'how did you hear', 'referral', 'earliest start date',
+  'university', 'college', 'degree',
 ];
 
 const APPLY_SIGNALS = [
@@ -173,8 +174,15 @@ function isJobApplication(fields: SemanticField[], haystack: string): boolean {
   const hasFileInput = fields.some((f) => f.type === 'file');
   const hasIdentity =
     haystack.includes('email') && (haystack.includes('name') || haystack.includes('first name'));
+  const pageSignal = /apply|career|job|hiring|join (our|the) team|open (role|position)/i.test(
+    `${document.title} ${document.querySelector('h1')?.textContent ?? ''}`
+  );
 
-  return keywordHits >= 2 || (keywordHits >= 1 && hasFileInput) || (hasApplySignal && hasIdentity && keywordHits >= 1);
+  if (keywordHits >= 2) return true;
+  if (keywordHits >= 1 && hasFileInput) return true;
+  if (keywordHits >= 1 && pageSignal && hasIdentity) return true;
+  if (hasApplySignal && hasIdentity && keywordHits >= 1) return true;
+  return false;
 }
 
 export function groupIntoSections(fields: SemanticField[]): FormSection[] {
