@@ -153,7 +153,11 @@ export function canonicalSkill(raw: string): string | null {
 
   const titleCase = trimmed
     .split(/[\s\-_]+/)
-    .map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .map((w) => {
+      if (w.length <= 5 && w === w.toUpperCase() && w !== w.toLowerCase()) return w;
+      if (w.length <= 3 && !/[a-z]/.test(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
     .join(' ');
   return titleCase;
 }
