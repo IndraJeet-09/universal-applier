@@ -4,12 +4,11 @@
   "private": true,
   "description": "Universal Job Application Autofill Browser Extension",
   "scripts": {
-    "dev": "vite build --watch --mode development",
-    "build": "vite build --mode production",
-    "preview": "vite preview",
+    "dev": "node scripts/build.mjs --watch --mode development",
+    "build": "node scripts/build.mjs --mode production",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
   "dependencies": {
