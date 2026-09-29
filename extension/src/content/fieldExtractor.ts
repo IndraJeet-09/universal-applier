@@ -47,6 +47,25 @@ function getAriaDescription(element: Element): string | undefined {
   return ownDescription?.trim() || undefined;
 }
 
+function textFromPreviousSibling(element: Element): string | undefined {
+  const prev = element.previousElementSibling;
+  if (!prev) return undefined;
+
+  if (prev.tagName === 'LABEL') {
+    const text = prev.textContent?.trim();
+    if (text && text.length <= 120) return text;
+    return undefined;
+  }
+
+  const labelInSibling = prev.querySelector('label, [class*="label"], [class*="title"]');
+  const text = labelInSibling?.textContent?.trim();
+  if (text && text.length <= 120) return text;
+
+  const ownText = prev.textContent?.trim();
+  if (ownText && ownText.length <= 80 && /[a-zA-Z]/.test(ownText)) return ownText;
+  return undefined;
+}
+
 export function getAssociatedLabel(element: HTMLElement): string | undefined {
   if (element.id) {
     try {
@@ -65,6 +84,9 @@ export function getAssociatedLabel(element: HTMLElement): string | undefined {
     const text = clone.textContent?.trim();
     if (text) return text;
   }
+
+  const siblingText = textFromPreviousSibling(element);
+  if (siblingText) return siblingText;
 
   return getLabelledByText(element);
 }

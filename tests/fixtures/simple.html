@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Software Engineer Application — Acme Corp</title>
+</head>
+<body>
+  <h1>Software Engineer</h1>
+  <p>Acme Corp · Bengaluru · Full-time</p>
+
+  <form id="application-form">
+    <fieldset>
+      <legend>Personal Information</legend>
+
+      <label for="full-name">Full Name</label>
+      <input type="text" id="full-name" name="full_name" required />
+
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" autocomplete="email" required />
+
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" name="phone" autocomplete="tel" />
+
+      <label for="location">Current Location</label>
+      <input type="text" id="location" name="location" placeholder="City, Country" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Professional Links</legend>
+
+      <label for="linkedin">LinkedIn Profile</label>
+      <input type="url" id="linkedin" name="linkedin_url" />
+
+      <label for="github">GitHub Profile</label>
+      <input type="url" id="github" name="github_url" />
+
+      <label for="portfolio">Portfolio Website</label>
+      <input type="url" id="portfolio" name="website" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Experience</legend>
+
+      <label for="years">Years of professional experience</label>
+      <input type="number" id="years" name="exp_years" min="0" max="50" />
+
+      <label for="current-title">Current Job Title</label>
+      <input type="text" id="current-title" name="title" />
+
+      <label for="resume">Resume/CV</label>
+      <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Additional Questions</legend>
+
+      <label for="work-auth">Are you authorized to work in India?</label>
+      <select id="work-auth" name="authorized">
+        <option value="">Select…</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+
+      <label for="why-company">Why do you want to work at Acme Corp?</label>
+      <textarea id="why-company" name="q_4021" rows="4"></textarea>
+
+      <label>
+        <input type="checkbox" id="terms" name="terms" />
+        I agree to the Terms of Service and Privacy Policy
+      </label>
+    </fieldset>
+
+    <button type="submit">Submit Application</button>
+  </form>
+</body>
+</html>

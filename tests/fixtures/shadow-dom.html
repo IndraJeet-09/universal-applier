@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Shadow DOM Application Form</title>
+</head>
+<body>
+  <h1>Apply — DevOps Engineer</h1>
+
+  <form id="main-form">
+    <label for="main-email">Contact Email</label>
+    <input type="email" id="main-email" name="email" />
+  </form>
+
+  <applicant-widget></applicant-widget>
+
+  <script>
+    // Executed only in a real browser; jsdom tests attach the shadow root themselves.
+    class ApplicantWidget extends HTMLElement {
+      connectedCallback() {
+        if (this.shadowRoot) return;
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = `
+          <div>
+            <label for="sh-name">Full name</label>
+            <input type="text" id="sh-name" name="full_name" />
+
+            <label for="sh-phone">Phone</label>
+            <input type="tel" id="sh-phone" name="phone" />
+
+            <div>
+              <span>GitHub username</span>
+              <input type="text" aria-label="GitHub username" placeholder="octocat" />
+            </div>
+
+            <nested-widget></nested-widget>
+          </div>
+        `;
+      }
+    }
+    customElements.define('applicant-widget', ApplicantWidget);
+
+    class NestedWidget extends HTMLElement {
+      connectedCallback() {
+        if (this.shadowRoot) return;
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = `
+          <label for="sh-linkedin">LinkedIn Profile</label>
+          <input type="text" id="sh-linkedin" name="linkedin" />
+        `;
+      }
+    }
+    customElements.define('nested-widget', NestedWidget);
+  </script>
+</body>
+</html>
