@@ -5,8 +5,8 @@ const MONTH_MAP: Record<string, number> = {
   oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
 };
 
-const MONTH_PATTERN = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
-const OPEN_ENDED = '(present|current|now|ongoing|till\\s+date|to\\s+date)';
+const MONTH_PATTERN = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const OPEN_ENDED = '(?:present|current|now|ongoing|till\\s+date|to\\s+date)';
 
 export interface DateRange {
   start?: string;
@@ -27,13 +27,15 @@ function parseToken(token: string): { month?: number; year?: number } | null {
   const t = token.trim().toLowerCase();
   if (!t) return null;
 
-  const monthYear = t.match(new RegExp(`^${MONTH_PATTERN}\\s+(\\d{4})$`));
-  if (monthYear) {
-    return { month: MONTH_MAP[monthYear[1]], year: parseInt(monthYear[2], 10) };
+  const monthYear = t.match(new RegExp(`^(?<mon>${MONTH_PATTERN})\\s+(?<year>\\d{4})$`));
+  if (monthYear?.groups?.year) {
+    const monthName = monthYear.groups.mon ?? '';
+    return { month: MONTH_MAP[monthName], year: parseInt(monthYear.groups.year, 10) };
   }
-  const yearMonth = t.match(new RegExp(`^(\\d{4})\\s+${MONTH_PATTERN}$`));
-  if (yearMonth) {
-    return { month: MONTH_MAP[yearMonth[2]], year: parseInt(yearMonth[1], 10) };
+  const yearMonth = t.match(new RegExp(`^(?<year>\\d{4})\\s+(?<mon>${MONTH_PATTERN})$`));
+  if (yearMonth?.groups?.year) {
+    const monthName = yearMonth.groups.mon ?? '';
+    return { month: MONTH_MAP[monthName], year: parseInt(yearMonth.groups.year, 10) };
   }
   const yearOnly = t.match(/^(\d{4})$/);
   if (yearOnly) {
