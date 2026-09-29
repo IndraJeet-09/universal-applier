@@ -42,18 +42,24 @@ interface Entry {
 }
 
 function collectEntries(lines: string[]): Entry[] {
-  const starts: number[] = [];
+  const dateIndexes: number[] = [];
   lines.forEach((line, i) => {
-    if (findDateRange(line)) starts.push(i);
+    if (findDateRange(line)) dateIndexes.push(i);
   });
 
-  if (starts.length === 0) return [];
+  if (dateIndexes.length === 0) return [];
+
+  const starts = dateIndexes.map((dIdx) => {
+    const prev = dIdx > 0 ? lines[dIdx - 1] : undefined;
+    const prevIsHeader = prev !== undefined && !isBullet(prev) && !findDateRange(prev);
+    return prevIsHeader ? dIdx - 1 : dIdx;
+  });
 
   const entries: Entry[] = [];
   for (let s = 0; s < starts.length; s++) {
     const from = starts[s];
     const to = s + 1 < starts.length ? starts[s + 1] : lines.length;
-    const range = findDateRange(lines[from]);
+    const range = findDateRange(lines[dateIndexes[s]]);
     if (!range) continue;
 
     const group = lines.slice(from, to);
@@ -62,32 +68,62 @@ function collectEntries(lines: string[]): Entry[] {
 
     group.forEach((line, idx) => {
       if (idx === 0) return;
-      if (isBullet(line)) bullets.push(stripBullet(line));
-      else extraLines.push(line);
+      if (isBullet(line)) {
+        bullets.push(stripBullet(line));
+      } else if (!findDateRange(line)) {
+        extraLines.push(line);
+      }
     });
 
-    entries.push({ headerLine: lines[from], extraLines, bullets, range });
+    entries.push({ headerLine: group[0], extraLines, bullets, range });
   }
   return entries;
+}
+
+const LOCATION_SEG_RE = /^[A-Za-z .'-]{2,30}$/;
+
+function splitTrailingLocation(part: string): { text: string; location?: string } {
+  const segs = part.split(',').map((s) => s.trim()).filter(Boolean);
+  if (segs.length < 2) return { text: part };
+
+  const last = segs[segs.length - 1];
+  const looksLikePlace = LOCATION_SEG_RE.test(last) && !COMPANY_RE.test(last) && !TITLE_RE.test(last);
+  if (looksLikePlace) {
+    return { text: segs.slice(0, -1).join(', '), location: last };
+  }
+  return { text: part };
 }
 
 function splitHeader(header: string): { parts: string[]; location?: string } {
   const stripped = stripDateRange(header);
   if (!stripped) return { parts: [] };
 
-  let parts = stripped
+  const rawParts = stripped
     .split(/\s+[—–•·▪|]\s+|\s+at\s+|\s+@\s+/i)
     .map((p) => p.trim())
     .filter(Boolean);
 
-  if (parts.length === 1 && /,/.test(parts[0])) {
+  let location: string | undefined;
+  const parts: string[] = [];
+
+  for (const raw of rawParts) {
+    const { text, location: loc } = splitTrailingLocation(raw);
+    if (loc && !location) location = loc;
+    parts.push(text);
+  }
+
+  if (parts.length === 1 && !location && /,/.test(parts[0])) {
     const segments = parts[0].split(',').map((s) => s.trim());
-    if (segments.length === 2) parts = segments;
+    if (segments.length === 2) {
+      parts.splice(0, 1, segments[0], segments[1]);
+    }
   }
 
   const locationIdx = parts.findIndex((p) => looksLikeLocation(p));
-  const location = locationIdx >= 0 ? parts[locationIdx] : undefined;
-  if (locationIdx >= 0) parts.splice(locationIdx, 1);
+  if (locationIdx >= 0 && !location) {
+    location = parts[locationIdx];
+    parts.splice(locationIdx, 1);
+  }
 
   return { parts, location };
 }

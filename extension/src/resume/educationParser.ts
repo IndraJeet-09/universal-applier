@@ -82,14 +82,13 @@ function extractInstitution(lines: string[]): { institution: string; location?: 
   }
 
   const line = lines[idx];
-  let institution = line;
-  let location: string | undefined;
+  const dashParts = line
+    .split(/\s+[—–|]\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  const parts = line.split(/\s+[—–|]\s+|,\s+/).map((p) => p.trim());
-  if (parts.length > 1) {
-    institution = parts.find((p) => INSTITUTION_RE.test(p)) ?? parts[0];
-    location = parts.find((p) => p !== institution && /^[A-Za-z .'-]+$/.test(p) && p.length <= 40);
-  }
+  const institution = dashParts.find((p) => INSTITUTION_RE.test(p)) ?? dashParts[0];
+  const location = dashParts.length > 1 ? dashParts.find((p) => p !== institution) : undefined;
 
   return { institution, location };
 }
@@ -100,10 +99,22 @@ export function parseEducation(lines: string[]): ParsedEducation[] {
   const entryStarts: number[] = [];
   lines.forEach((line, i) => {
     if (isBullet(line)) return;
-    if (INSTITUTION_RE.test(line) || DEGREE_RE.test(line)) {
-      if (i === 0 || entryStarts.length === 0 || i > entryStarts[entryStarts.length - 1]) {
+    const last = entryStarts.length > 0 ? entryStarts[entryStarts.length - 1] : -1;
+
+    if (INSTITUTION_RE.test(line)) {
+      if (entryStarts.length === 0) {
         entryStarts.push(i);
+        return;
       }
+      const group = lines.slice(last, i);
+      const groupHasInstitution = group.some((l) => INSTITUTION_RE.test(l));
+      const completingDegreeFirst = !groupHasInstitution && group.some((l) => DEGREE_RE.test(l));
+      if (!completingDegreeFirst) entryStarts.push(i);
+      return;
+    }
+
+    if (DEGREE_RE.test(line) && entryStarts.length === 0) {
+      entryStarts.push(i);
     }
   });
 
