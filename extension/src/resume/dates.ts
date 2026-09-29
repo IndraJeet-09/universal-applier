@@ -63,20 +63,22 @@ export function findDateRange(line: string): DateRange | null {
     if (!match) continue;
 
     const start = parseToken(match[1]);
-    if (!start?.year) continue;
+    if (!start || !start.year) continue;
+    const startIso = toIso(start.month, start.year);
 
     const endToken = match[2];
     const isCurrent = new RegExp(`^${OPEN_ENDED}$`, 'i').test(endToken.trim());
 
-    let end: { month?: number; year?: number } | null = null;
+    let endIso: string | undefined;
     if (!isCurrent) {
-      end = parseToken(endToken);
-      if (!end?.year) continue;
+      const end = parseToken(endToken);
+      if (!end || !end.year) continue;
+      endIso = toIso(end.month, end.year);
     }
 
     return {
-      start: toIso(start.month, start.year),
-      end: isCurrent ? undefined : end ? toIso(end.month, end.year) : undefined,
+      start: startIso,
+      end: endIso,
       current: isCurrent,
       raw: match[0],
     };

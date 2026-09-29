@@ -1,6 +1,6 @@
 import type { CandidateProfile, Links, PersonalInfo } from '@schemas/candidate';
 import { EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
-import { findDateRange, computeYearsOfExperience } from './dates';
+import { computeYearsOfExperience } from './dates';
 import { splitSections, type ResumeSections } from './sections';
 import { normalizeSkillList } from './skills';
 import { parseExperience } from './experienceParser';

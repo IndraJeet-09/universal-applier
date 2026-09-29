@@ -4,6 +4,10 @@ import { EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
 import type { AutofillSettings } from '@schemas/application';
 import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
 import { sendMessage } from '../utils/messaging';
+import { extractResumeText, detectFormat } from '../resume/parser';
+import { normalizeResume } from '../resume/normalizer';
+import { validateProfile } from '../resume/profileSchema';
+import { saveResumeFile, guessMimeType } from '../storage/resumeFileStore';
 
 type Tab = 'profile' | 'resume' | 'answers' | 'settings';
 
@@ -110,13 +114,27 @@ function ResumeTab({
   const onFile = async (file: File) => {
     setStatus('Parsing resume…');
     try {
-      const buf = await file.arrayBuffer();
-      const updated = await sendMessage<{ buffer: ArrayBuffer; filename: string }, CandidateProfile>(
-        'parse-resume',
-        { buffer: buf, filename: file.name }
+      const buffer = await file.arrayBuffer();
+      const text = await extractResumeText({ buffer, filename: file.name });
+      const parsed = normalizeResume(text);
+      const validation = validateProfile(parsed);
+      if (!validation.valid) {
+        throw new Error(`Parsed profile failed validation: ${validation.errors.join('; ')}`);
+      }
+      await sendMessage('set-profile', validation.profile);
+      await saveResumeFile({
+        filename: file.name,
+        format: detectFormat(file.name),
+        mimeType: guessMimeType(file.name, detectFormat(file.name)),
+        data: buffer,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
+      onProfileChange(validation.profile);
+      const p = validation.profile;
+      setStatus(
+        `Parsed: ${p.personal.fullName || 'name not found'} · ${p.experience.length} roles · ${p.education.length} education · ${p.projects.length} projects`
       );
-      onProfileChange(updated);
-      setStatus(`Parsed: ${updated.personal.fullName || 'name not found'} · ${updated.experience.length} roles · ${updated.education.length} education`);
     } catch (e) {
       setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
