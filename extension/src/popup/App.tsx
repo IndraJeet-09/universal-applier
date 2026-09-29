@@ -87,6 +87,7 @@ export default function App() {
     }
   }, [pageStatus.tabId]);
 
+  const tabId = pageStatus.tabId;
   const hasResume = Boolean(profile?.personal?.fullName);
   const analysis = pageStatus.analysis;
   const job = analysis?.jobContext;
@@ -168,6 +169,20 @@ export default function App() {
                   <li key={err}>{err}</li>
                 ))}
               </ul>
+            )}
+            {fillResult.needsReviewCount > 0 && tabId != null && (
+              <button
+                onClick={() =>
+                  void sendMessage(
+                    'show-review-panel',
+                    undefined,
+                    { tabId }
+                  ).catch((e) => setError(e instanceof Error ? e.message : String(e)))
+                }
+                className="w-full mt-1 rounded-md bg-amber-500 text-white py-1.5 font-medium hover:bg-amber-600"
+              >
+                Review {fillResult.needsReviewCount} fields in page
+              </button>
             )}
           </div>
         )}

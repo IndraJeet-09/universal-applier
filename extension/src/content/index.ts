@@ -12,6 +12,7 @@ import {
   type PlannerHooks,
 } from '../intelligence/fillPlanner';
 import { executeFillPlan, applyUserEdit, type FileToUpload } from './formFiller';
+import { createReviewPanel, type ReviewPanel } from './reviewPanel';
 import type { Classification } from '../intelligence/fieldClassifier';
 import * as candidateStore from '../storage/candidateStore';
 import * as settingsStore from '../storage/settingsStore';
@@ -20,6 +21,7 @@ const log = createLogger('content');
 
 let lastAnalysis: FormAnalysis | null = null;
 let lastPlan: FillPlan | null = null;
+let reviewPanel: ReviewPanel | null = null;
 let observing = false;
 
 type ClassifyRequest = {
@@ -167,6 +169,25 @@ registerHandlers({
       action.decision = 'auto_fill';
     }
     return result;
+  },
+
+  async 'show-review-panel'(): Promise<{ count: number }> {
+    if (!lastPlan) throw new Error('no fill plan available; build one first');
+    reviewPanel?.destroy();
+    reviewPanel = createReviewPanel(lastPlan, {
+      onClose: () => {
+        reviewPanel = null;
+      },
+    });
+    document.documentElement.appendChild(reviewPanel.element);
+    const count = reviewPanel.element.shadowRoot?.querySelectorAll('.item').length ?? 0;
+    return { count };
+  },
+
+  async 'close-review-panel'(): Promise<{ closed: boolean }> {
+    reviewPanel?.destroy();
+    reviewPanel = null;
+    return { closed: true };
   },
 });
 
