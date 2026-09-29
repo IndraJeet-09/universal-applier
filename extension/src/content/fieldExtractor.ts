@@ -2,7 +2,7 @@ export interface FieldSignals {
   label?: string;
   placeholder?: string;
   name?: string;
-  type?: string;
+  type: string;
   role?: string;
   autocomplete?: string;
   ariaLabel?: string;

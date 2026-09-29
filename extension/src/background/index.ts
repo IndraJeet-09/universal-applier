@@ -45,6 +45,10 @@ const handlers = {
   async 'set-ai-config'(payload: AIConfig): Promise<void> {
     await settingsStore.setAIConfig(payload);
   },
+
+  async 'content-fields-updated'(payload: { count: number }): Promise<void> {
+    log.debug('content script reported field changes', payload);
+  },
 };
 
 registerHandlers(handlers);
