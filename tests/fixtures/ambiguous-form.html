@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Candidate Form</title>
+</head>
+<body>
+  <h1>Application</h1>
+
+  <form>
+    <div class="q">
+      <span class="q-text">How many years have you worked professionally?</span>
+      <input type="text" name="field_1" />
+    </div>
+
+    <div class="q">
+      <span class="q-text">Are you legally authorized to work in the United States?</span>
+      <div class="radio-group" role="radiogroup" aria-label="Work authorization">
+        <label><input type="radio" name="field_2" value="1" /> Yes</label>
+        <label><input type="radio" name="field_2" value="0" /> No</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="q-text">Do you require visa sponsorship now or in the future?</span>
+      <div class="radio-group">
+        <label><input type="radio" name="field_3" value="yes" /> Yes</label>
+        <label><input type="radio" name="field_3" value="no" /> No</label>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="q-text">What are your salary expectations?</span>
+      <input type="text" name="field_4" />
+    </div>
+
+    <div class="q">
+      <span class="q-text">Where can we see your code?</span>
+      <input type="text" name="candidate_code" />
+    </div>
+
+    <div class="q">
+      <span class="q-text">Preferred pronouns</span>
+      <input type="text" name="field_5" />
+    </div>
+  </form>
+</body>
+</html>
