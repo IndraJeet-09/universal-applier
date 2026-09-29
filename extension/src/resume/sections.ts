@@ -8,7 +8,7 @@ export interface ResumeSections {
   certifications: string[];
 }
 
-type HeaderMatcher = (line: string) => string | null;
+type HeaderMatcher = (line: string) => keyof ResumeSections | null;
 
 export function splitSections(lines: string[], matchHeader: HeaderMatcher): ResumeSections {
   const sections: ResumeSections = {
