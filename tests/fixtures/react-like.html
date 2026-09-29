@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Career Application</title>
+</head>
+<body>
+  <div id="root">
+    <h1>Join Our Team — Product Designer</h1>
+
+    <form class="react-form">
+      <div class="form-row">
+        <input
+          type="text"
+          class="MuiInput-input"
+          placeholder="First name"
+          aria-label="First name"
+          data-testid="first-name"
+        />
+        <input
+          type="text"
+          class="MuiInput-input"
+          placeholder="Last name"
+          aria-label="Last name"
+          data-testid="last-name"
+        />
+      </div>
+
+      <div class="form-row">
+        <input
+          type="email"
+          class="MuiInput-input"
+          placeholder="Email address"
+          autocomplete="email"
+        />
+        <input
+          type="tel"
+          class="MuiInput-input"
+          placeholder="Mobile phone number"
+          autocomplete="tel"
+        />
+      </div>
+
+      <div class="form-row">
+        <div role="combobox" aria-label="Country/Region" tabindex="0" class="MuiSelect-select">
+          <span>Country/Region</span>
+        </div>
+        <input
+          type="text"
+          class="MuiInput-input"
+          aria-label="City"
+          placeholder="City"
+        />
+      </div>
+
+      <label class="MuiFormControlLabel-label">
+        <span>Link to your portfolio or Behance profile</span>
+        <input type="text" class="MuiInput-input" />
+      </label>
+
+      <label class="MuiFormControlLabel-label">
+        <span>Years of design experience</span>
+        <input type="number" class="MuiInput-input" />
+      </label>
+
+      <label class="MuiFormControlLabel-label">
+        <span>Tell us about a project you are proud of</span>
+        <textarea class="MuiInput-input" rows="5"></textarea>
+      </label>
+
+      <button type="button" class="MuiButton-root">Continue</button>
+    </form>
+  </div>
+</body>
+</html>
