@@ -23,10 +23,21 @@ export function isInteractable(element: Element): boolean {
 
 export function isVisible(element: Element): boolean {
   if (!element.isConnected) return false;
-  const style = getComputedStyle(element);
-  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-    return false;
+
+  let current: Element | null = element;
+  let depth = 0;
+  while (current && depth < 25) {
+    if (current.hasAttribute('hidden') || current.getAttribute('aria-hidden') === 'true') {
+      return false;
+    }
+    const style = getComputedStyle(current);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+    current = current.parentElement;
+    depth += 1;
   }
+
   const rect = element.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
 }

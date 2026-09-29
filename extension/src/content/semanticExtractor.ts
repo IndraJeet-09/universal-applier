@@ -4,6 +4,7 @@ import { queryInteractive } from './domScanner';
 import { extractSignals } from './fieldExtractor';
 import { collectRoots } from './shadowDomScanner';
 import { createLogger } from '../utils/logger';
+import { cssEscape } from '../utils/dom';
 
 const log = createLogger('semantic');
 
@@ -39,7 +40,7 @@ function toSemanticField(element: Element, selector: string): SemanticField {
 }
 
 export function buildSelector(element: Element): string {
-  if (element.id) return `#${CSS.escape(element.id)}`;
+  if (element.id) return `#${cssEscape(element.id)}`;
   const path: string[] = [];
   let current: Element | null = element;
   while (current && current !== document.body) {
@@ -108,9 +109,13 @@ export interface JobPageContext {
   employmentType?: string;
 }
 
+export function visiblePageText(): string {
+  if (typeof document.body?.innerText === 'string') return document.body.innerText;
+  return document.body?.textContent ?? '';
+}
+
 export function extractPageText(maxChars = 20000): string {
-  const text = document.body?.innerText ?? '';
-  return text.slice(0, maxChars);
+  return visiblePageText().slice(0, maxChars);
 }
 
 export function detectJobContext(text: string): JobContext | undefined {
@@ -160,7 +165,8 @@ export function classifyForm(fields: SemanticField[]): FormAnalysis['formType'] 
   if (!fields.some((f) => f.type !== 'submit' && f.type !== 'button')) return 'unknown';
 
   for (const [type, keywords] of Object.entries(FORM_KEYWORDS)) {
-    if (keywords.every((k) => haystack.includes(k))) {
+    const hits = keywords.filter((k) => haystack.includes(k)).length;
+    if (hits >= 2) {
       return type as FormAnalysis['formType'];
     }
   }
@@ -170,11 +176,12 @@ export function classifyForm(fields: SemanticField[]): FormAnalysis['formType'] 
 
 function isJobApplication(fields: SemanticField[], haystack: string): boolean {
   const keywordHits = JOB_KEYWORDS.filter((k) => haystack.includes(k)).length;
-  const hasApplySignal = APPLY_SIGNALS.some((s) => document.body?.innerText?.toLowerCase().includes(s));
+  const pageText = visiblePageText().toLowerCase();
+  const hasApplySignal = APPLY_SIGNALS.some((s) => pageText.includes(s));
   const hasFileInput = fields.some((f) => f.type === 'file');
   const hasIdentity =
     haystack.includes('email') && (haystack.includes('name') || haystack.includes('first name'));
-  const pageSignal = /apply|career|job|hiring|join (our|the) team|open (role|position)/i.test(
+  const pageSignal = /appl(?:y|ication)|career|job|hiring|join (our|the) team|open (role|position)/i.test(
     `${document.title} ${document.querySelector('h1')?.textContent ?? ''}`
   );
 
@@ -182,6 +189,7 @@ function isJobApplication(fields: SemanticField[], haystack: string): boolean {
   if (keywordHits >= 1 && hasFileInput) return true;
   if (keywordHits >= 1 && pageSignal && hasIdentity) return true;
   if (hasApplySignal && hasIdentity && keywordHits >= 1) return true;
+  if (pageSignal && hasIdentity && fields.length >= 3) return true;
   return false;
 }
 

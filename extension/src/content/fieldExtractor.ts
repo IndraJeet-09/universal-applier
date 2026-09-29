@@ -1,3 +1,5 @@
+import { cssEscape } from '../utils/dom';
+
 export interface FieldSignals {
   label?: string;
   placeholder?: string;
@@ -47,33 +49,40 @@ function getAriaDescription(element: Element): string | undefined {
   return ownDescription?.trim() || undefined;
 }
 
+function looksLikeLabelText(text: string): boolean {
+  if (text.length === 0 || text.length > 120) return false;
+  if (/[.!?]$/.test(text)) return false;
+  if (/[·|•]/.test(text)) return false;
+  return /[a-zA-Z]/.test(text);
+}
+
 function textFromPreviousSibling(element: Element): string | undefined {
   const prev = element.previousElementSibling;
   if (!prev) return undefined;
 
   if (prev.tagName === 'LABEL') {
     const text = prev.textContent?.trim();
-    if (text && text.length <= 120) return text;
+    if (looksLikeLabelText(text ?? '')) return text;
     return undefined;
   }
 
   const labelInSibling = prev.querySelector('label, [class*="label"], [class*="title"]');
-  const text = labelInSibling?.textContent?.trim();
-  if (text && text.length <= 120) return text;
+  const labelText = labelInSibling?.textContent?.trim();
+  if (labelText && looksLikeLabelText(labelText)) return labelText;
 
   const ownText = prev.textContent?.trim();
-  if (ownText && ownText.length <= 80 && /[a-zA-Z]/.test(ownText)) return ownText;
+  if (ownText && looksLikeLabelText(ownText) && ownText.length <= 80) return ownText;
   return undefined;
 }
 
 export function getAssociatedLabel(element: HTMLElement): string | undefined {
   if (element.id) {
     try {
-      const byFor = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+      const byFor = document.querySelector(`label[for="${cssEscape(element.id)}"]`);
       const text = textOrNull(byFor);
       if (text) return text;
     } catch {
-      /* CSS.escape unavailable or invalid id */
+      /* invalid id selector */
     }
   }
 
@@ -109,7 +118,6 @@ export function getSurroundingText(element: Element, maxDepth = 3, maxLength = 3
 }
 
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"]';
-
 export function getSectionHeading(element: Element): string | undefined {
   let current: Element | null = element.parentElement;
   let depth = 0;
@@ -180,7 +188,8 @@ function resolveType(element: Element): string {
 
 export function extractSignals(element: Element): FieldSignals {
   const htmlEl = element as HTMLElement;
-  const label = getAssociatedLabel(htmlEl);
+  const ariaLabel = element.getAttribute('aria-label')?.trim() || undefined;
+  const label = getAssociatedLabel(htmlEl) ?? ariaLabel;
 
   return {
     label,
@@ -189,7 +198,7 @@ export function extractSignals(element: Element): FieldSignals {
     type: resolveType(element),
     role: element.getAttribute('role')?.trim() || undefined,
     autocomplete: element.getAttribute('autocomplete')?.trim() || undefined,
-    ariaLabel: element.getAttribute('aria-label')?.trim() || undefined,
+    ariaLabel,
     description: getAriaDescription(element),
     surroundingText: getSurroundingText(element),
     options: extractOptions(element),
