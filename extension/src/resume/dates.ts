@@ -41,7 +41,7 @@ function parseToken(token: string): { month?: number; year?: number } | null {
   if (yearOnly) {
     return { year: parseInt(yearOnly[1], 10) };
   }
-  const slash = t.match(/^(\d{1,2})[\/.](\d{4})$/);
+  const slash = t.match(/^(\d{1,2})[/.](\d{4})$/);
   if (slash) {
     return { month: parseInt(slash[1], 10), year: parseInt(slash[2], 10) };
   }
