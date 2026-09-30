@@ -114,6 +114,8 @@ const ALIASES: Record<string, string> = {
   kotlin: 'Kotlin',
 };
 
+export const KNOWN_SKILL_NAMES: readonly string[] = [...new Set(Object.values(ALIASES))];
+
 const CATEGORY_RULES: Array<{ category: SkillCategory; words: RegExp[] }> = [
   {
     category: 'programmingLanguages',

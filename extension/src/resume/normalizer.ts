@@ -3,6 +3,7 @@ import { EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
 import { computeYearsOfExperience } from './dates';
 import { splitSections, type ResumeSections } from './sections';
 import { normalizeSkillList } from './skills';
+import { extractCapabilities } from './capabilities';
 import { parseExperience } from './experienceParser';
 import { parseEducation } from './educationParser';
 import { parseProjects, parseCertifications, parseSkillsSection, extractSummary } from './otherParsers';
@@ -188,6 +189,7 @@ export function normalizeResume(rawText: string): CandidateProfile {
     experience,
     projects,
     skills,
+    capabilities: extractCapabilities({ skills, experience, projects, education }),
     certifications,
     links,
     metadata: {
