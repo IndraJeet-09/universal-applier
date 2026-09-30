@@ -1,4 +1,4 @@
-import type { CandidateProfile } from '@schemas/candidate';
+import { flattenSkills, type CandidateProfile } from '@schemas/candidate';
 import type { AnswerGenerationInput, QuestionType } from '@schemas/ai';
 import type { JobContext } from '@schemas/dom';
 import type { Links } from '@schemas/candidate';
@@ -75,14 +75,7 @@ export function buildAnswerInput(
         institution: entry.institution,
         fieldOfStudy: entry.fieldOfStudy,
       })),
-      skills: [
-        ...profile.skills.programmingLanguages,
-        ...profile.skills.frameworks,
-        ...profile.skills.databases,
-        ...profile.skills.cloud,
-        ...profile.skills.tools,
-        ...profile.skills.other,
-      ],
+      skills: flattenSkills(profile.skills),
       projects: profile.projects.map((project) => ({
         name: project.name,
         description: project.description,
