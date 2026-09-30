@@ -56,4 +56,5 @@ export function getLogEntries(filter?: { scope?: string; level?: LogLevel }): Lo
 
 export function clearLogEntries(): void {
   entries.length = 0;
-}// scratch
+}
+
