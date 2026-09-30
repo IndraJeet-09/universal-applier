@@ -7,12 +7,12 @@ import { extractCapabilities } from './capabilities';
 import { parseExperience } from './experienceParser';
 import { parseEducation } from './educationParser';
 import { parseProjects, parseCertifications, parseSkillsSection, extractSummary } from './otherParsers';
+import { URL_TOKEN_RE, findUrl, isLikelyUrl, toAbsoluteUrl } from './urls';
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 const PHONE_RE = /(\+?\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}\b/;
 const GITHUB_RE = /github\.com\/[a-zA-Z0-9._-]+/i;
 const LINKEDIN_RE = /linkedin\.com\/in\/[a-zA-Z0-9._-]+/i;
-const URL_RE = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s,;)*)]*)?)/g;
 
 const SECTION_HEADERS = {
   summary: /^(summary|profile|professional summary|about (me|the candidate)|objective|career objective)$/,
@@ -70,12 +70,18 @@ function extractLinks(text: string): Links {
   const linkedin = text.match(LINKEDIN_RE);
   if (linkedin) links.linkedin = `https://${linkedin[0]}`;
 
-  const urls = [...text.matchAll(URL_RE)]
-    .map((m) => m[0])
-    .filter((u) => !GITHUB_RE.test(u) && !LINKEDIN_RE.test(u) && !u.includes('@'));
+  const urls: string[] = [];
+  for (const match of text.matchAll(URL_TOKEN_RE)) {
+    const token = match[0];
+    const before = text[(match.index ?? 0) - 1];
+    if (before === '@') continue;
+    if (!isLikelyUrl(token)) continue;
+    if (GITHUB_RE.test(token) || LINKEDIN_RE.test(token)) continue;
+    urls.push(token);
+  }
 
   for (const url of urls) {
-    const full = url.startsWith('http') ? url : `https://${url}`;
+    const full = toAbsoluteUrl(url);
     const domain = full.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     if (!links.portfolio && !domain.includes('github') && !domain.includes('linkedin')) {
       links.portfolio = full;
@@ -88,7 +94,7 @@ function extractLinks(text: string): Links {
 
 function looksLikeName(line: string): boolean {
   if (line.length < 3 || line.length > 60) return false;
-  if (EMAIL_RE.test(line) || URL_RE.test(line) || PHONE_RE.test(line)) return false;
+  if (EMAIL_RE.test(line) || findUrl(line) || PHONE_RE.test(line)) return false;
   const words = line.split(/\s+/).filter((w) => /^[A-Za-z.'-]+$/.test(w));
   if (words.length < 2 || words.length > 5) return false;
   const capitalized = words.filter((w) => /^[A-Z]/.test(w) || /^\./.test(w));
