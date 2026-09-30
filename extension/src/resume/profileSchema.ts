@@ -177,6 +177,7 @@ export function mergeWithDefaults(profile: Partial<CandidateProfile>): Candidate
     ...EMPTY_CANDIDATE_PROFILE,
     ...profile,
     skills: { ...EMPTY_CANDIDATE_PROFILE.skills, ...(profile.skills ?? {}) },
+    capabilities: profile.capabilities ?? EMPTY_CANDIDATE_PROFILE.capabilities,
     personal: { ...EMPTY_CANDIDATE_PROFILE.personal, ...(profile.personal ?? {}) },
     professional: { ...EMPTY_CANDIDATE_PROFILE.professional, ...(profile.professional ?? {}) },
     links: { ...EMPTY_CANDIDATE_PROFILE.links, ...(profile.links ?? {}) },
