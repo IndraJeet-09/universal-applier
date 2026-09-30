@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CandidateProfile } from '@schemas/candidate';
-import { EMPTY_CANDIDATE_PROFILE } from '@schemas/candidate';
+import { EMPTY_CANDIDATE_PROFILE, flattenSkills, type CandidateProfile } from '@schemas/candidate';
 import type { AutofillSettings } from '@schemas/application';
 import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
 import { sendMessage } from '../utils/messaging';
@@ -83,7 +82,7 @@ function ProfileTab({ profile }: { profile: CandidateProfile }) {
     ['Phone', profile.personal.phone ?? ''],
     ['Location', profile.personal.location ?? ''],
     ['Headline', profile.professional.headline ?? ''],
-    ['Skills', profile.skills.programmingLanguages.concat(profile.skills.frameworks).join(', ')],
+    ['Skills', flattenSkills(profile.skills).join(', ')],
     ['Education', profile.education.map((e) => `${e.degree}, ${e.institution}`).join('; ')],
     ['Experience', profile.experience.map((e) => `${e.title} @ ${e.company}`).join('; ')],
     ['GitHub', profile.links.github ?? ''],
