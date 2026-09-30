@@ -86,7 +86,7 @@ const capabilitySchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
-export const candidateProfileSchema: z.ZodType<CandidateProfile> = z.object({
+const profileObject = z.object({
   personal: z.object({
     fullName: z.string(),
     firstName: z.string().optional(),
@@ -156,6 +156,24 @@ export const candidateProfileSchema: z.ZodType<CandidateProfile> = z.object({
     version: z.number(),
   }),
 });
+
+/**
+ * A blank profile is valid (nothing entered yet), but once a name is present an
+ * email is mandatory because every application form needs one.
+ */
+export const candidateProfileSchema: z.ZodType<CandidateProfile> = profileObject.superRefine(
+  (profile, ctx) => {
+    const hasName = profile.personal.fullName.trim().length > 0;
+    const hasEmail = profile.personal.email.trim().length > 0;
+    if (hasName && !hasEmail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['personal', 'email'],
+        message: 'personal.email is required once the profile has a name',
+      });
+    }
+  }
+);
 
 export type ProfileValidationResult =
   | { valid: true; profile: CandidateProfile }
