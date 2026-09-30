@@ -51,6 +51,7 @@ function makeProfile(overrides: Partial<CandidateProfile> = {}): CandidateProfil
       frameworks: ['React', 'Node.js'],
       databases: ['PostgreSQL'],
       cloud: ['AWS'],
+      devops: [],
       tools: ['Git'],
       other: [],
     },
