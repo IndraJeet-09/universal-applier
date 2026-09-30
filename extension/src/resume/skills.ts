@@ -1,4 +1,11 @@
-export type SkillCategory = 'programmingLanguages' | 'frameworks' | 'databases' | 'cloud' | 'tools' | 'other';
+export type SkillCategory =
+  | 'programmingLanguages'
+  | 'frameworks'
+  | 'databases'
+  | 'cloud'
+  | 'devops'
+  | 'tools'
+  | 'other';
 
 const ALIASES: Record<string, string> = {
   js: 'JavaScript',
@@ -129,7 +136,13 @@ const CATEGORY_RULES: Array<{ category: SkillCategory; words: RegExp[] }> = [
   {
     category: 'cloud',
     words: [
-      /^(aws|gcp|google cloud|azure|microsoft azure|docker|kubernetes|k8s|terraform|ansible|jenkins|github actions|gitlab ci|circleci|vercel|netlify|heroku|cloudflare|openshift|linux|ubuntu|centos|nginx)$/,
+      /^(aws|gcp|google cloud|azure|microsoft azure|vercel|netlify|heroku|cloudflare|openshift|linux|ubuntu|centos|nginx)$/,
+    ],
+  },
+  {
+    category: 'devops',
+    words: [
+      /^(docker|kubernetes|k8s|terraform|ansible|jenkins|github actions|gitlab ci|circleci|ci\/cd|helm|argocd|prometheus|grafana)$/,
     ],
   },
   {
