@@ -1,7 +1,8 @@
 import type { Project, Certification } from '@schemas/candidate';
 import { findYear } from './dates';
 import { isBullet, stripBullet } from './sections';
-import { splitSkillLine } from './skills';
+import { canonicalSkill, splitSkillLine } from './skills';
+import { findUrl, toAbsoluteUrl } from './urls';
 
 export function extractSummary(lines: string[]): string | undefined {
   const text = lines.join(' ').trim();
@@ -9,60 +10,94 @@ export function extractSummary(lines: string[]): string | undefined {
   return text.length > 800 ? `${text.slice(0, 797).trimEnd()}…` : text;
 }
 
-const URL_IN_LINE = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s)]*)?/;
+const TECH_LINE_RE = /(?:built with|technologies|tech stack|stack)\s*:?\s*(.+?)(?:\.\s|$)/i;
+
+/** Prose words that mean the captured segment is a sentence, not a tech list. */
+const PROSE_WORD_RE =
+  /\b(for|with|using|the|an?|of|in|on|to|by|our|my|your|that|this|from|as|at|it|is|are|was|were|who|which|when|where|we|i|he|she|they)\b/i;
+
+function looksLikeProjectHeader(line: string, previousWasBullet: boolean): boolean {
+  if (!previousWasBullet) return false;
+  if (line.length > 60) return false;
+  if (/[.!?]$/.test(line)) return false;
+  return /^[A-Z0-9]/.test(line);
+}
+
+function looksLikeTechList(segment: string): boolean {
+  return !PROSE_WORD_RE.test(segment.replace(/\band\b/gi, ' '));
+}
+
+function technologiesFrom(description: string): { technologies?: string[]; description: string } {
+  const techMatch = description.match(TECH_LINE_RE);
+  if (!techMatch) return { description };
+
+  const segment = techMatch[1].trim();
+  if (!looksLikeTechList(segment)) return { description };
+
+  const technologies = splitSkillLine(segment)
+    .map((raw) => canonicalSkill(raw))
+    .filter((name): name is string => Boolean(name));
+
+  if (technologies.length === 0) return { description };
+  return {
+    technologies,
+    description: description.replace(techMatch[0], '').trim(),
+  };
+}
 
 export function parseProjects(lines: string[]): Omit<Project, 'id'>[] {
   const results: Omit<Project, 'id'>[] = [];
   let current: Omit<Project, 'id'> | null = null;
+  let previousWasBullet = false;
 
   for (const line of lines) {
     if (isBullet(line)) {
+      previousWasBullet = true;
       if (!current) continue;
       const bullet = stripBullet(line);
-      const url = bullet.match(URL_IN_LINE);
+      const url = findUrl(bullet);
       if (url && !current.url) {
-        current.url = url[0].startsWith('http') ? url[0] : `https://${url[0]}`;
-        const desc = bullet.replace(URL_IN_LINE, '').trim();
-        if (desc) current.description = current.description ? `${current.description} ${desc}` : desc;
+        current.url = toAbsoluteUrl(url);
+        const desc = bullet.replace(url, '').trim();
+        if (desc) {
+          current.description = current.description ? `${current.description} ${desc}` : desc;
+        }
       } else {
         current.highlights = [...(current.highlights ?? []), bullet];
       }
       continue;
     }
 
+    const isHeaderCandidate = looksLikeProjectHeader(line, previousWasBullet);
+    previousWasBullet = false;
+
     if (line.length < 3 || line.length > 120) continue;
 
-    if (current) {
-      const url = line.match(URL_IN_LINE);
-      if (url && !current.url) {
-        current.url = url[0].startsWith('http') ? url[0] : `https://${url[0]}`;
-      } else if (!current.description) {
-        current.description = line;
-      } else if (line.length > 40) {
-        current.description = `${current.description} ${line}`;
-      }
+    const startsNewProject = !current || (isHeaderCandidate && (current.highlights?.length ?? 0) > 0);
+    if (startsNewProject) {
+      const url = findUrl(line);
+      const name =
+        (url ? line.replace(url, '') : line).replace(/[:•\s]+$/, '').trim() || line.trim();
+      const entry: Omit<Project, 'id'> = { name, highlights: undefined };
+      if (url) entry.url = toAbsoluteUrl(url);
+      results.push(entry);
+      current = entry;
       continue;
     }
 
-    const name = line.replace(URL_IN_LINE, '').replace(/[:•\s]+$/, '').trim();
-    if (!name) continue;
-    current = { name, highlights: undefined };
-    const url = line.match(URL_IN_LINE);
-    if (url) current.url = url[0].startsWith('http') ? url[0] : `https://${url[0]}`;
-    results.push(current);
+    if (!current) continue;
+
+    const url = findUrl(line);
+    if (url && !current.url) {
+      current.url = toAbsoluteUrl(url);
+    } else if (!current.description) {
+      current.description = line;
+    } else if (line.length > 40) {
+      current.description = `${current.description} ${line}`;
+    }
   }
 
-  return results.map((p) => {
-    const techMatch = p.description?.match(/(?:built with|technologies|stack)\s*:\s*([^.]+)/i);
-    if (techMatch) {
-      return {
-        ...p,
-        technologies: splitSkillLine(techMatch[1]),
-        description: p.description?.replace(techMatch[0], '').trim(),
-      };
-    }
-    return p;
-  });
+  return results.map((p) => (p.description ? { ...p, ...technologiesFrom(p.description) } : p));
 }
 
 export function parseCertifications(lines: string[]): Omit<Certification, 'id'>[] {
