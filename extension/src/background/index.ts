@@ -1,4 +1,4 @@
-import type { CandidateProfile } from '@schemas/candidate';
+import { flattenSkills, type CandidateProfile } from '@schemas/candidate';
 import type { AutofillSettings } from '@schemas/application';
 import type { AIConfig, FieldClassificationInput, FieldClassificationOutput } from '@schemas/ai';
 import type { JobContext } from '@schemas/dom';
@@ -91,14 +91,7 @@ const handlers = {
       provider.classifyField({
         field: payload.field,
         candidateProfile: {
-          skills: [
-            ...profile.skills.programmingLanguages,
-            ...profile.skills.frameworks,
-            ...profile.skills.databases,
-            ...profile.skills.cloud,
-            ...profile.skills.tools,
-            ...profile.skills.other,
-          ],
+          skills: flattenSkills(profile.skills),
           links: linksToRecord(profile.links),
           experience: profile.experience.map((e) => ({ title: e.title, company: e.company })),
           education: profile.education.map((e) => ({ degree: e.degree, institution: e.institution })),
