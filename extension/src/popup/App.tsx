@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CandidateProfile } from '@schemas/candidate';
+import { flattenSkills, type CandidateProfile } from '@schemas/candidate';
 import type { FormAnalysis } from '@schemas/dom';
 import type { AutofillSettings, AutofillResult } from '@schemas/application';
 import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
@@ -89,6 +89,7 @@ export default function App() {
 
   const tabId = pageStatus.tabId;
   const hasResume = Boolean(profile?.personal?.fullName);
+  const topSkills = flattenSkills(profile?.skills).slice(0, 8);
   const analysis = pageStatus.analysis;
   const job = analysis?.jobContext;
 
@@ -119,6 +120,33 @@ export default function App() {
             </button>
           )}
         </div>
+
+        {hasResume && profile && (
+          <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 space-y-2">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-gray-500">Candidate</div>
+              <div className="font-medium truncate">{profile.personal.fullName}</div>
+              {profile.professional.headline && (
+                <div className="text-xs text-gray-600 truncate">{profile.professional.headline}</div>
+              )}
+            </div>
+            {topSkills.length > 0 && (
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-gray-500">Skills</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {topSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded bg-white border border-gray-200 px-1.5 py-0.5 text-xs text-gray-700"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {job?.title && (
           <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
@@ -194,7 +222,7 @@ export default function App() {
             onClick={() => void chrome.runtime.openOptionsPage()}
             className="hover:text-gray-900"
           >
-            Candidate Profile
+            View Profile
           </button>
           <button
             onClick={() => {
