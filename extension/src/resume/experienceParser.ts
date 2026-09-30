@@ -1,5 +1,6 @@
 import { findDateRange, stripDateRange, type DateRange } from './dates';
 import { isBullet, stripBullet } from './sections';
+import { canonicalSkill, splitSkillLine } from './skills';
 
 export interface ParsedExperience {
   company: string;
@@ -175,7 +176,9 @@ export function parseExperience(lines: string[]): ParsedExperience[] {
 
     const techLine = entry.extraLines.find((l) => /^(tech|technologies|stack|tools)\s*:/i.test(l));
     const technologies = techLine
-      ? techLine.replace(/^[^:]+:\s*/, '').split(/[,;|]/).map((t) => t.trim()).filter(Boolean)
+      ? splitSkillLine(techLine.replace(/^[^:]+:\s*/, ''))
+          .map((raw) => canonicalSkill(raw))
+          .filter((name): name is string => Boolean(name))
       : undefined;
 
     if (!title && !company) continue;
