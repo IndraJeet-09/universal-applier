@@ -9,12 +9,28 @@ export async function getCandidateProfile(): Promise<CandidateProfile> {
     const result = await chrome.storage.local.get(CANDIDATE_KEY);
     const data = result[CANDIDATE_KEY];
     if (data && data.version === STORAGE_VERSION) {
-      return data as CandidateProfile;
+      return hydrateProfile(data as Partial<CandidateProfile>);
     }
     return EMPTY_CANDIDATE_PROFILE;
   } catch {
     return EMPTY_CANDIDATE_PROFILE;
   }
+}
+
+function hydrateProfile(data: Partial<CandidateProfile>): CandidateProfile {
+  return {
+    ...EMPTY_CANDIDATE_PROFILE,
+    ...data,
+    personal: { ...EMPTY_CANDIDATE_PROFILE.personal, ...(data.personal ?? {}) },
+    skills: { ...EMPTY_CANDIDATE_PROFILE.skills, ...(data.skills ?? {}) },
+    capabilities: data.capabilities ?? [],
+    education: data.education ?? [],
+    experience: data.experience ?? [],
+    projects: data.projects ?? [],
+    certifications: data.certifications ?? [],
+    applicationAnswers: data.applicationAnswers ?? [],
+    metadata: { ...EMPTY_CANDIDATE_PROFILE.metadata, ...(data.metadata ?? {}) },
+  };
 }
 
 export async function setCandidateProfile(profile: CandidateProfile): Promise<void> {
@@ -51,50 +67,4 @@ function deepMerge(target: unknown, source: unknown): unknown {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-export async function addApplicationAnswer(
-  question: string,
-  answer: string,
-  tags?: string[],
-  scope: 'global' | 'company' | 'role' = 'global'
-): Promise<void> {
-  const profile = await getCandidateProfile();
-  const newAnswer = {
-    id: crypto.randomUUID(),
-    question,
-    answer,
-    tags,
-    scope,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  profile.applicationAnswers.push(newAnswer);
-  await setCandidateProfile(profile);
-}
-
-export async function getApplicationAnswers(): Promise<CandidateProfile['applicationAnswers']> {
-  const profile = await getCandidateProfile();
-  return profile.applicationAnswers;
-}
-
-export async function findMatchingAnswer(question: string, threshold = 0.8): Promise<CandidateProfile['applicationAnswers'][0] | null> {
-  const answers = await getApplicationAnswers();
-  const normalizedQuestion = question.toLowerCase().trim();
-  for (const ans of answers) {
-    const normalizedAns = ans.question.toLowerCase().trim();
-    const similarity = calculateSimilarity(normalizedQuestion, normalizedAns);
-    if (similarity >= threshold) {
-      return ans;
-    }
-  }
-  return null;
-}
-
-function calculateSimilarity(a: string, b: string): number {
-  const wordsA = new Set(a.split(/\s+/));
-  const wordsB = new Set(b.split(/\s+/));
-  const intersection = new Set([...wordsA].filter(x => wordsB.has(x)));
-  const union = new Set([...wordsA, ...wordsB]);
-  return intersection.size / union.size;
 }

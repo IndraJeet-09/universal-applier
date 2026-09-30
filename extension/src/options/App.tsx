@@ -6,7 +6,7 @@ import { sendMessage } from '../utils/messaging';
 import { extractResumeText, detectFormat } from '../resume/parser';
 import { normalizeResume } from '../resume/normalizer';
 import { validateProfile } from '../resume/profileSchema';
-import { saveResumeFile, guessMimeType } from '../storage/resumeFileStore';
+import { saveResumeFile, guessMimeType } from '../storage/resumeStore';
 
 type Tab = 'profile' | 'resume' | 'answers' | 'settings';
 

@@ -1,3 +1,4 @@
 export * from './candidateStore';
 export * from './settingsStore';
-export * from './resumeFileStore';
+export * from './resumeStore';
+export * from './answerStore';
