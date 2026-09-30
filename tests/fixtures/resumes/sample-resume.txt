@@ -1,0 +1,52 @@
+Indrajeet Chouhan
+Senior Full-Stack Engineer
+Bengaluru, Karnataka, India
+indrajeet@example-dev.io | +91 98765 43210
+github.com/indrajeet | linkedin.com/in/indrajeet-chouhan | indrajeet.dev
+
+PROFESSIONAL SUMMARY
+Full-stack engineer with 6 years of experience building web platforms and developer tooling.
+
+SKILLS
+
+Languages: TypeScript, JavaScript, Python, SQL, Go
+Frameworks: React, Next.js, Node, NodeJS, Express
+Databases: Postgres, MongoDB, Redis, MySQL
+Cloud: AWS, GCP
+DevOps: Docker, Kubernetes, Terraform, GitHub Actions
+Tools: Git, Jira, Figma
+
+EXPERIENCE
+
+Senior Software Engineer — Acme Technologies, Bengaluru
+Jan 2022 - Present
+Tech: Node.js, React, PostgreSQL, Redis, AWS
+- Built a job-matching service with Redis caching that cut p95 latency by 40%
+- Led migration of a monolith to microservices on AWS
+
+Software Engineer at Startup Labs Pvt Ltd, Remote
+Jun 2019 – Dec 2021
+- Shipped a React dashboard used by 10k users
+- Designed MySQL schemas for a billing platform
+
+EDUCATION
+
+Indian Institute of Technology, Bombay
+B.Tech in Computer Science and Engineering
+2015 - 2019
+GPA: 8.9/10
+
+PROJECTS
+
+Talent-IQ
+Backend service for talent scoring built with Node.js, TypeScript, PostgreSQL and Redis
+- Used Redis in backend application for caching
+- Cut model inference time by 60% with batched writes
+- github.com/indrajeet/talent-iq
+
+Campus Notices
+- Mobile app built with React Native for campus notices
+
+CERTIFICATIONS
+
+AWS Certified Solutions Architect - Amazon, 2023
