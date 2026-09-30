@@ -1,5 +1,6 @@
 import type { FormAnalysis, FieldCategory, JobContext } from '@schemas/dom';
-import type { AutofillResult, FilledField } from '@schemas/application';
+import type { AutofillResult, AutofillSettings, FilledField } from '@schemas/application';
+import type { CandidateProfile } from '@schemas/candidate';
 import type { FieldClassificationInput, FieldClassificationOutput } from '@schemas/ai';
 import { registerHandlers, sendMessage } from '../utils/messaging';
 import { createLogger, setDebugMode } from '../utils/logger';
@@ -14,8 +15,6 @@ import {
 import { executeFillPlan, applyUserEdit, type FileToUpload } from './formFiller';
 import { createReviewPanel, type ReviewPanel } from './reviewPanel';
 import type { Classification } from '../intelligence/fieldClassifier';
-import * as candidateStore from '../storage/candidateStore';
-import * as settingsStore from '../storage/settingsStore';
 
 const log = createLogger('content');
 
@@ -133,8 +132,8 @@ registerHandlers({
   },
 
   async 'build-fill-plan'(): Promise<FillPlan> {
-    const profile = await candidateStore.getCandidateProfile();
-    const settings = await settingsStore.getSettings();
+    const profile = await sendMessage<void, CandidateProfile>('get-profile');
+    const settings = await sendMessage<void, AutofillSettings>('get-settings');
     refreshRegistry();
     const fields = getRegistry().map((entry) => entry.field);
     lastPlan = await buildFillPlan(fields, profile, settings, createAiHooks());
