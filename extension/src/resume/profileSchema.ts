@@ -68,8 +68,22 @@ const skillsSchema = z.object({
   frameworks: z.array(z.string()),
   databases: z.array(z.string()),
   cloud: z.array(z.string()),
+  devops: z.array(z.string()),
   tools: z.array(z.string()),
   other: z.array(z.string()),
+});
+
+const capabilitySchema = z.object({
+  name: z.string().min(1),
+  category: z.string().min(1),
+  evidence: z.array(
+    z.object({
+      source: z.enum(['resume', 'project', 'experience', 'education', 'user']),
+      reference: z.string().optional(),
+      description: z.string().optional(),
+    })
+  ),
+  confidence: z.number().min(0).max(1),
 });
 
 export const candidateProfileSchema: z.ZodType<CandidateProfile> = z.object({
@@ -112,6 +126,7 @@ export const candidateProfileSchema: z.ZodType<CandidateProfile> = z.object({
   experience: z.array(experienceSchema),
   projects: z.array(projectSchema),
   skills: skillsSchema,
+  capabilities: z.array(capabilitySchema),
   certifications: z.array(certificationSchema),
   links: z.object({
     github: z.string().optional(),
