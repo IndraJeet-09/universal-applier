@@ -14,9 +14,9 @@ Webpage  (untrusted, has no access to candidate data)
    ↕ DOM only
 Content script  (extension-isolated world)
    ↕ chrome.tabs.sendMessage (typed MessageEnvelope)
-Background service worker  (only place that reads storage + talks to the AI provider)
-   ↕ chrome.storage.local
-Local storage  (candidate profile, original resume, settings, saved answers)
+Background service worker  (gateway to storage and to the AI provider)
+   ↕ chrome.storage
+chrome.storage  (candidate profile, original resume, settings, saved answers)
 ```
 
 | Layer | Lives in | Responsibility |
@@ -27,15 +27,18 @@ Local storage  (candidate profile, original resume, settings, saved answers)
 | Options | `extension/src/options/` | Profile view, resume upload, saved answers, settings |
 | Intelligence | `extension/src/intelligence/` | Field taxonomy, deterministic classifier, fill planner, answer generation |
 | Resume | `extension/src/resume/` | Text extraction, sectioning, parsing, normalization, capability evidence |
-| Storage | `extension/src/storage/` | Thin typed wrappers over `chrome.storage.local` |
+| Storage | `extension/src/storage/` | Thin typed wrappers over `chrome.storage` |
 | Shared schemas | `packages/schemas/` | Single source of truth for types + Zod validation |
 | AI client | `packages/ai/` | Provider abstraction, prompt building, response validation, caching, errors |
 
-### Why a background worker owns storage
+### Who may touch storage
 
-Content scripts run in the page's origin. If they could read the profile, any
-compromised page (or a future bug) could leak it. All reads/writes go through the
-service worker, which also redacts what leaves the extension for AI calls.
+Only privileged extension contexts: the background service worker and the
+popup/options pages. The content script never opens `chrome.storage` itself — when
+it needs the profile to build a fill plan it sends `get-profile` / `get-settings` to
+the worker and gets exactly that document back. Keeping one hop between stored
+candidate data and the page means the release point is auditable. AI calls leave
+from here too, carrying a reduced profile slice rather than the whole document.
 
 ## Message protocol
 
@@ -71,16 +74,21 @@ popup                         background                    content
 ## Privacy model
 
 1. **Web pages never see candidate data.** The profile lives in
-   `chrome.storage.local`; only the service worker reads it. Content scripts receive
-   the *values they are about to fill*, scoped to a single plan, and never a way to
-   enumerate the profile.
+   `chrome.storage.local` and is only released to extension contexts: the service
+   worker, the popup/options pages, and — while building a fill plan — the content
+   script's isolated world. Page JavaScript cannot reach any of those. The only thing
+   a page can observe is a value written into an input, indistinguishable from the
+   user having typed it.
 2. **No remote code.** CSP is `script-src 'self'`; there is no `eval`, no
    `new Function`, no dynamically injected script from a URL.
 3. **AI is opt-in and minimized.** Requests are made only from the service worker
-   using the user-configured provider. The prompt carries the field context and the
-   minimum profile slice needed to answer — not the whole resume — and responses are
-   validated against a Zod schema before use. Failures degrade to deterministic
-   behaviour (skip / mark for review), never to a blind fill.
+   using the user-configured provider, and only field metadata crosses that boundary
+   for classification (`ai-classify`). Answer generation (`ai-answer`) builds a
+   reduced slice of the profile in the worker — name, location, headline, roles,
+   education, skills, projects, links — never the raw resume file, phone number or
+   date of birth. Responses are validated against a Zod schema before use, and
+   failures degrade to deterministic behaviour (skip / mark for review), never to a
+   blind fill.
 4. **Sensitive fields are skipped by default** (demographics, legal, security
    questions) — see `skipSensitiveFields` in settings.
 5. **The original resume is stored untouched** and is only read for file-input
