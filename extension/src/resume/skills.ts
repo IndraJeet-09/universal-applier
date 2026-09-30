@@ -142,7 +142,7 @@ const CATEGORY_RULES: Array<{ category: SkillCategory; words: RegExp[] }> = [
   {
     category: 'devops',
     words: [
-      /^(docker|kubernetes|k8s|terraform|ansible|jenkins|github actions|gitlab ci|circleci|ci\/cd|helm|argocd|prometheus|grafana)$/,
+      /^(docker|kubernetes|k8s|terraform|ansible|jenkins|github actions|gitlab ci|circleci|ci\/cd|helm|argocd|prometheus)$/,
     ],
   },
   {
@@ -188,6 +188,7 @@ export function normalizeSkillList(rawSkills: string[]): {
   frameworks: string[];
   databases: string[];
   cloud: string[];
+  devops: string[];
   tools: string[];
   other: string[];
 } {
@@ -196,6 +197,7 @@ export function normalizeSkillList(rawSkills: string[]): {
     frameworks: new Set(),
     databases: new Set(),
     cloud: new Set(),
+    devops: new Set(),
     tools: new Set(),
     other: new Set(),
   };
@@ -211,6 +213,7 @@ export function normalizeSkillList(rawSkills: string[]): {
     frameworks: [...buckets.frameworks],
     databases: [...buckets.databases],
     cloud: [...buckets.cloud],
+    devops: [...buckets.devops],
     tools: [...buckets.tools],
     other: [...buckets.other],
   };
