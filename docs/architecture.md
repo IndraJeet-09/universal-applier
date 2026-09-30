@@ -1,0 +1,154 @@
+# Architecture
+
+## Goals
+
+The extension must work on job portals it has never seen. Instead of per-site
+selectors, it builds a structural model of whatever page it is on (fields, labels,
+sections, job context) and decides what to fill from that model plus the candidate
+profile. Website-specific code paths are explicitly out of scope.
+
+## Layers
+
+```text
+Webpage  (untrusted, has no access to candidate data)
+   ↕ DOM only
+Content script  (extension-isolated world)
+   ↕ chrome.tabs.sendMessage (typed MessageEnvelope)
+Background service worker  (only place that reads storage + talks to the AI provider)
+   ↕ chrome.storage.local
+Local storage  (candidate profile, original resume, settings, saved answers)
+```
+
+| Layer | Lives in | Responsibility |
+| --- | --- | --- |
+| Content script | `extension/src/content/` | Scan DOM/shadow DOM, classify fields, execute fill plans, render the in-page review panel |
+| Background worker | `extension/src/background/` | Message hub, storage access, AI proxy, settings, logging |
+| Popup | `extension/src/popup/` | Status, candidate summary, analyze/autofill actions |
+| Options | `extension/src/options/` | Profile view, resume upload, saved answers, settings |
+| Intelligence | `extension/src/intelligence/` | Field taxonomy, deterministic classifier, fill planner, answer generation |
+| Resume | `extension/src/resume/` | Text extraction, sectioning, parsing, normalization, capability evidence |
+| Storage | `extension/src/storage/` | Thin typed wrappers over `chrome.storage.local` |
+| Shared schemas | `packages/schemas/` | Single source of truth for types + Zod validation |
+| AI client | `packages/ai/` | Provider abstraction, prompt building, response validation, caching, errors |
+
+### Why a background worker owns storage
+
+Content scripts run in the page's origin. If they could read the profile, any
+compromised page (or a future bug) could leak it. All reads/writes go through the
+service worker, which also redacts what leaves the extension for AI calls.
+
+## Message protocol
+
+`extension/src/utils/messaging.ts` wraps `chrome.runtime` / `chrome.tabs` messaging
+in a request/response envelope:
+
+```ts
+interface MessageEnvelope<T> { type: string; payload?: T; requestId: string }
+interface MessageResult<T>   { requestId: string; success: boolean; data?: T; error?: string }
+```
+
+Both the worker and the content script call `registerHandlers({ 'message-name': fn })`;
+callers use `sendMessage('message-name', payload, 'background' | { tabId })`. Every
+response is validated at the boundary, and failures surface as readable errors rather
+than `undefined`.
+
+Representative flow of one autofill:
+
+```text
+popup                         background                    content
+  │  analyze-form             │                              │
+  ├───────────────────────────┼──────────────────────────────►│
+  │                           │◄──── FormAnalysis ────────────┤
+  │  build-fill-plan          │                              │
+  ├───────────────────────────┼──────────────────────────────►│  (classifier → planner,
+  │                           │◄──── FillPlan ────────────────┤   AI only for uncertain fields)
+  │  execute-fill             │                              │
+  ├───────────────────────────┼──────────────────────────────►│  fills DOM, returns result
+  │  show-review-panel        │                              │
+  ├───────────────────────────┼──────────────────────────────►│  overlay for user review
+```
+
+## Privacy model
+
+1. **Web pages never see candidate data.** The profile lives in
+   `chrome.storage.local`; only the service worker reads it. Content scripts receive
+   the *values they are about to fill*, scoped to a single plan, and never a way to
+   enumerate the profile.
+2. **No remote code.** CSP is `script-src 'self'`; there is no `eval`, no
+   `new Function`, no dynamically injected script from a URL.
+3. **AI is opt-in and minimized.** Requests are made only from the service worker
+   using the user-configured provider. The prompt carries the field context and the
+   minimum profile slice needed to answer — not the whole resume — and responses are
+   validated against a Zod schema before use. Failures degrade to deterministic
+   behaviour (skip / mark for review), never to a blind fill.
+4. **Sensitive fields are skipped by default** (demographics, legal, security
+   questions) — see `skipSensitiveFields` in settings.
+5. **The original resume is stored untouched** and is only read for file-input
+   attachment; parsing produces a separate structured profile.
+6. **Nothing is uploaded by default.** Removing the extension (or clearing site data
+   for `chrome.storage`) removes everything.
+
+## Storage model
+
+No IndexedDB is needed at this stage: a profile is a single small document read in
+one shot, so `chrome.storage` is enough.
+
+| Store | Area | Key | Contents |
+| --- | --- | --- | --- |
+| `candidateStore.ts` | local | `candidate_profile` | Structured profile + storage `version` for migration/hydration |
+| `resumeStore.ts` | local | `resume_file` | Original file bytes (`ArrayBuffer`), filename, format, mime, size, timestamp |
+| `settingsStore.ts` | local | `ai_config` | AI provider configuration — kept local because it can contain an API key |
+| `settingsStore.ts` | sync | `autofill_settings` | Non-sensitive autofill toggles, mirrored across the user's devices |
+| `answerStore.ts` | local | (inside the profile) | Saved/reusable application answers with `global`/`company`/`role` scope |
+
+Sensitive material (profile, resume, credentials) never enters sync storage; a legacy
+synced `ai_config` is migrated to local storage on first read.
+
+Conventions:
+
+- Stores expose small async functions (`get*`, `set*`, `clear*`); no store is
+  imported by a content script directly.
+- `getCandidateProfile()` hydrates missing buckets from
+  `EMPTY_CANDIDATE_PROFILE`, so older stored data keeps validating as the schema
+  grows.
+- Writes are whole-value (read → merge → write) because a profile is a single small
+  document; there is no partial-update API to get out of sync.
+
+## Data flow: resume → profile
+
+```text
+file (PDF/DOCX/TXT)
+  → extractResumeText()   pdfjs-dist / fflate+XML / utf-8
+  → splitSections()       preamble, summary, skills, experience, education, projects, certifications
+  → parsers               experienceParser, educationParser, otherParsers, skills
+  → normalizeSkillList()  alias → canonical name, bucket by category
+  → extractCapabilities() evidence + confidence index
+  → validateProfile()     Zod; failure aborts the save with readable errors
+  → candidateStore        profile
+  → resumeStore           original bytes (untouched)
+```
+
+See [candidate-profile.md](candidate-profile.md) for the schema and normalization
+rules.
+
+## Build and testing
+
+- `scripts/build.mjs` runs two Vite builds: extension pages (`popup`, `options`,
+  `background`) and the content script, emitting MV3 artifacts + `manifest.json`
+  into `dist/`.
+- Vitest runs in a Node environment with the same path aliases as the app
+  (`@schemas`, `@ai`, `@shared`, `@`). DOM-dependent suites use `jsdom` plus HTML
+  fixtures in `tests/fixtures/` (simple, dynamic, shadow-DOM, multi-step, unknown-ATS
+  forms) so scanner/classifier/filler behaviour is exercised without a browser.
+- Resume suites run against a realistic fixture resume
+  (`tests/fixtures/resumes/sample-resume.txt`) covering the whole pipeline.
+
+## Extension points
+
+- **New field types** → add to `intelligence/taxonomy.ts` and the classifier rules;
+  the registry and planner consume the taxonomy, so no page-specific code is needed.
+- **New profile data** → extend `packages/schemas/candidate.ts`, then
+  `extension/src/resume/profileSchema.ts` and the hydration defaults in
+  `candidateStore`.
+- **New AI provider** → implement the `AIProvider` interface in `packages/ai` and
+  register it in `createProvider`.
