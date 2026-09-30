@@ -1,4 +1,4 @@
-import type { CandidateProfile, ApplicationAnswer } from '@schemas/candidate';
+import { flattenSkills, type CandidateProfile, type ApplicationAnswer } from '@schemas/candidate';
 import { isSensitiveKey, SYNONYMS, normalizeText } from './taxonomy';
 
 export type ValueSource = 'profile' | 'saved_answer' | 'none';
@@ -215,14 +215,7 @@ export function resolveValue(
     }
 
     case 'skills': {
-      const all = [
-        ...profile.skills.programmingLanguages,
-        ...profile.skills.frameworks,
-        ...profile.skills.databases,
-        ...profile.skills.cloud,
-        ...profile.skills.tools,
-        ...profile.skills.other,
-      ];
+      const all = flattenSkills(profile.skills);
       return all.length > 0 ? ok(semanticField, all.join(', '), 'skills') : fallback('no skills');
     }
     case 'programming_languages': {
