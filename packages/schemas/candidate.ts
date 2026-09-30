@@ -92,15 +92,16 @@ export interface Skills {
   other: string[];
 }
 
-export function flattenSkills(skills: Skills): string[] {
+export function flattenSkills(skills: Skills | null | undefined): string[] {
+  if (!skills) return [];
   return [
-    ...skills.programmingLanguages,
-    ...skills.frameworks,
-    ...skills.databases,
-    ...skills.cloud,
-    ...skills.devops,
-    ...skills.tools,
-    ...skills.other,
+    ...(skills.programmingLanguages ?? []),
+    ...(skills.frameworks ?? []),
+    ...(skills.databases ?? []),
+    ...(skills.cloud ?? []),
+    ...(skills.devops ?? []),
+    ...(skills.tools ?? []),
+    ...(skills.other ?? []),
   ];
 }
 
