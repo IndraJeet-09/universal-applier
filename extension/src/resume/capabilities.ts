@@ -151,7 +151,7 @@ function roleReference(title: string, company?: string): string {
 
 function combineWeights(weights: number[]): number {
   const residual = weights.reduce((acc, w) => acc * (1 - Math.min(Math.max(w, 0), 1)), 1);
-  return Math.round((1 - residual) * 100) / 100;
+  return Math.min(0.99, Math.round((1 - residual) * 100) / 100);
 }
 
 /**
