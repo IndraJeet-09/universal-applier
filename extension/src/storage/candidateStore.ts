@@ -11,25 +11,34 @@ export async function getCandidateProfile(): Promise<CandidateProfile> {
     if (data && data.version === STORAGE_VERSION) {
       return hydrateProfile(data as Partial<CandidateProfile>);
     }
-    return EMPTY_CANDIDATE_PROFILE;
+    return hydrateProfile({});
   } catch {
-    return EMPTY_CANDIDATE_PROFILE;
+    return hydrateProfile({});
   }
 }
 
+/**
+ * Always returns a fresh object: callers mutate the profile before saving it,
+ * and the empty profile constant must never be shared by reference.
+ */
 function hydrateProfile(data: Partial<CandidateProfile>): CandidateProfile {
+  const base = structuredClone(EMPTY_CANDIDATE_PROFILE);
   return {
-    ...EMPTY_CANDIDATE_PROFILE,
+    ...base,
     ...data,
-    personal: { ...EMPTY_CANDIDATE_PROFILE.personal, ...(data.personal ?? {}) },
-    skills: { ...EMPTY_CANDIDATE_PROFILE.skills, ...(data.skills ?? {}) },
-    capabilities: data.capabilities ?? [],
-    education: data.education ?? [],
-    experience: data.experience ?? [],
-    projects: data.projects ?? [],
-    certifications: data.certifications ?? [],
-    applicationAnswers: data.applicationAnswers ?? [],
-    metadata: { ...EMPTY_CANDIDATE_PROFILE.metadata, ...(data.metadata ?? {}) },
+    personal: { ...base.personal, ...(data.personal ?? {}) },
+    professional: { ...base.professional, ...(data.professional ?? {}) },
+    skills: { ...base.skills, ...(data.skills ?? {}) },
+    links: { ...base.links, ...(data.links ?? {}) },
+    preferences: { ...base.preferences, ...(data.preferences ?? {}) },
+    workAuthorization: { ...base.workAuthorization, ...(data.workAuthorization ?? {}) },
+    capabilities: data.capabilities ?? base.capabilities,
+    education: data.education ?? base.education,
+    experience: data.experience ?? base.experience,
+    projects: data.projects ?? base.projects,
+    certifications: data.certifications ?? base.certifications,
+    applicationAnswers: data.applicationAnswers ?? base.applicationAnswers,
+    metadata: { ...base.metadata, ...(data.metadata ?? {}) },
   };
 }
 

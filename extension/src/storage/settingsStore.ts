@@ -21,19 +21,33 @@ export async function setSettings(settings: Partial<AutofillSettings>): Promise<
   return merged;
 }
 
+/**
+ * Provider configuration can contain an API key, so it deliberately lives in
+ * local storage. Autofill toggles above are harmless preferences and stay in
+ * sync storage.
+ */
 export async function getAIConfig(): Promise<AIConfig | null> {
   try {
-    const result = await chrome.storage.sync.get(AI_CONFIG_KEY);
-    return result[AI_CONFIG_KEY] ?? null;
+    const local = await chrome.storage.local.get(AI_CONFIG_KEY);
+    if (local[AI_CONFIG_KEY]) return local[AI_CONFIG_KEY] as AIConfig;
+
+    const legacy = await chrome.storage.sync.get(AI_CONFIG_KEY);
+    const config = legacy[AI_CONFIG_KEY] as AIConfig | undefined;
+    if (config) {
+      await chrome.storage.local.set({ [AI_CONFIG_KEY]: config });
+      await chrome.storage.sync.remove(AI_CONFIG_KEY);
+      return config;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
 export async function setAIConfig(config: AIConfig): Promise<void> {
-  await chrome.storage.sync.set({ [AI_CONFIG_KEY]: config });
+  await chrome.storage.local.set({ [AI_CONFIG_KEY]: config });
 }
 
 export async function clearAIConfig(): Promise<void> {
-  await chrome.storage.sync.remove(AI_CONFIG_KEY);
+  await chrome.storage.local.remove(AI_CONFIG_KEY);
 }
