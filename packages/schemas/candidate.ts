@@ -87,8 +87,21 @@ export interface Skills {
   frameworks: string[];
   databases: string[];
   cloud: string[];
+  devops: string[];
   tools: string[];
   other: string[];
+}
+
+export function flattenSkills(skills: Skills): string[] {
+  return [
+    ...skills.programmingLanguages,
+    ...skills.frameworks,
+    ...skills.databases,
+    ...skills.cloud,
+    ...skills.devops,
+    ...skills.tools,
+    ...skills.other,
+  ];
 }
 
 export interface Links {
@@ -98,6 +111,21 @@ export interface Links {
   twitter?: string;
   website?: string;
   other?: string[];
+}
+
+export type CapabilitySource = 'resume' | 'project' | 'experience' | 'education' | 'user';
+
+export interface CapabilityEvidence {
+  source: CapabilitySource;
+  reference?: string;
+  description?: string;
+}
+
+export interface CandidateCapability {
+  name: string;
+  category: string;
+  evidence: CapabilityEvidence[];
+  confidence: number;
 }
 
 export interface ApplicationAnswer {
@@ -125,6 +153,7 @@ export interface CandidateProfile {
   experience: Experience[];
   projects: Project[];
   skills: Skills;
+  capabilities: CandidateCapability[];
   certifications: Certification[];
   links: Links;
   preferences: {
@@ -158,9 +187,11 @@ export const EMPTY_CANDIDATE_PROFILE: CandidateProfile = {
     frameworks: [],
     databases: [],
     cloud: [],
+    devops: [],
     tools: [],
     other: [],
   },
+  capabilities: [],
   certifications: [],
   links: {},
   preferences: {},
