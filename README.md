@@ -21,8 +21,24 @@ The foundation (Part 1) is complete:
 - Local-only storage layer and privacy boundaries
 - Test suite (Vitest) covering schema, parsing, normalization, capabilities, persistence
 
-The universal form pipeline is also in place on top of that foundation: semantic DOM
-scan (including shadow DOM) → deterministic field classification → fill plan →
+The universal DOM intelligence engine (Part 2) is complete:
+
+- DOM scanner over document, nested shadow roots and accessible iframes
+  (cross-origin frames are skipped gracefully, never fatal)
+- Label resolution: `label[for]`, wrapping labels, sibling text, ARIA — scoped
+  per tree
+- Compact `SemanticField` schema with structural fingerprints; rescans keep
+  stable ids and never reprocess unchanged fields
+- Deterministic field taxonomy + synonym dictionaries (no AI for obvious fields)
+- Confidence bands (`exact`/`strong`/`contextual`/`weak`/`unknown`) with a hard
+  0.60 unknown floor
+- Page classifier: `NOT_JOB_PAGE` / `JOB_LISTING` / `APPLICATION_FORM` /
+  `APPLICATION_STEP` / `UNKNOWN` — contact and login pages stay excluded
+- MutationObserver-driven rescans for dynamic, React-rendered and multi-step forms
+- In-page debug panel showing `#n · Label · Semantic · Confidence` per field
+- Synthetic fixtures for every major form style (no proprietary markup)
+
+Fill execution builds on that engine (Part 3): semantic scan → fill plan →
 execution → in-page review, with AI used only for fields the deterministic tiers
 cannot resolve confidently.
 
@@ -53,10 +69,13 @@ extension/
   public/            manifest.json, icons
   src/
     background/      MV3 service worker: message hub, AI proxy, storage access
-    content/         in-page scanner, field registry, form filler, review panel
+    content/         scanner, field extractor, semantic extractor, root collector
+                     (shadow DOM + iframes), field registry, mutation observer,
+                     debug panel, form filler, review panel
     popup/           toolbar popup (status, candidate summary, autofill actions)
     options/         profile, resume upload, saved answers, settings
-    intelligence/    field classifier, fill planner, answer generator, taxonomy
+    intelligence/    field classifier, page classifier, confidence bands,
+                     fill planner, answer generator, taxonomy, candidate matcher
     resume/          extraction, sectioning, parsing, normalization, capabilities
     storage/         candidateStore, resumeStore, settingsStore, answerStore
     utils/           messaging, logging, DOM helpers

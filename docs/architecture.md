@@ -40,6 +40,99 @@ the worker and gets exactly that document back. Keeping one hop between stored
 candidate data and the page means the release point is auditable. AI calls leave
 from here too, carrying a reduced profile slice rather than the whole document.
 
+## Universal DOM intelligence
+
+The core subsystem understands arbitrary application forms without any
+website-specific selectors:
+
+```text
+Unknown webpage
+   ↓  content/domScanner.ts        input, textarea, select, radio, checkbox, file,
+                                   contenteditable, ARIA roles, custom controls
+   ↓  content/rootCollector.ts     document → shadowRoot (+ nested) → accessible
+                                   iframes (+ their shadow roots); cross-origin
+                                   frames are reported "iframe inaccessible"
+                                   and never crash the scan
+   ↓  content/fieldExtractor.ts    labels (label[for], wrapping label, sibling
+                                   text, aria-labelledby), descriptions,
+                                   placeholder, headings, fieldset/legend,
+                                   section, options, required/disabled/visible
+   ↓  content/semanticExtractor.ts SemanticField list + page signals + sections
+   ↓  intelligence/fieldClassifier deterministic tiers: input type → autocomplete
+                                   → label/aria synonyms → heuristics → name →
+                                   placeholder → surrounding text → section
+   ↓  intelligence/confidence.ts   band: exact ≥0.97, strong ≥0.90,
+                                   contextual ≥0.75, weak ≥0.60, else unknown
+   ↓  intelligence/pageClassifier  NOT_JOB_PAGE | JOB_LISTING | APPLICATION_FORM |
+                                   APPLICATION_STEP | UNKNOWN
+```
+
+Everything sent downstream (including to the AI, when configured) is the compact
+`SemanticField` — never the whole page.
+
+### Semantic field schema
+
+`packages/schemas/dom.ts` defines `SemanticField`: element type, label,
+placeholder, name, type, role, aria metadata, description, surrounding text,
+section, options, required/visible/disabled flags and a `fingerprint`.
+
+- **Fingerprint** hashes only structural signals (label, name, placeholder,
+  type, section). Volatile surrounding copy is deliberately excluded, so an
+  untouched field keeps the same fingerprint — and the same `field-*` id —
+  across rescans. Rescans therefore never reprocess unchanged fields; the
+  registry reuses resolved elements and prunes removed ones.
+- Duplicate fingerprints (identical fields in one scan) get ordered suffixes in
+  document order.
+
+### Label resolution order
+
+For every element the extractor tries, in order: `label[for]` inside the
+element's own tree → wrapping `<label>` (minus control text) → previous sibling
+text → `aria-labelledby` → `aria-label`. Id lookups are scoped to the tree the
+element lives in (document, shadow root or iframe document), which is what makes
+labels resolve inside shadow DOM and same-origin frames.
+
+### Confidence bands
+
+| Band | Range | Typical source |
+| --- | --- | --- |
+| exact | ≥ 0.97 | exact `autocomplete`, exact label |
+| strong | ≥ 0.90 | strong synonym match |
+| contextual | ≥ 0.75 | contextual/phrase match |
+| weak | ≥ 0.60 | weak inference |
+| unknown | < 0.60 | discarded — never guessed, eligible for AI fallback |
+
+Deterministic tiers run first and are consulted for every field; the AI is only
+reached for fields below 0.60 by the fill planner.
+
+### Page classification
+
+`intelligence/pageClassifier.ts` scores compact page signals (title, headings,
+control texts, field summaries, truncated visible text) against job evidence:
+application/resume/education/… terms, apply CTAs, file uploads, identity fields,
+step progress. Contact and sign-in pages are explicitly held out, so a generic
+contact form is never labelled a job application.
+
+### Dynamic DOM
+
+`content/mutationObserver.ts` watches child/attribute changes with debouncing;
+each change triggers a rescan that adds only new fingerprints. `MutationObserver`
+plus stable fingerprints covers React-rendered forms, dialogs and next-step
+forms.
+
+### Debug mode
+
+With debug on (popup **Debug** toggle or `set-debug` message) the content script
+renders `content/debugPanel.ts`: an in-page overlay listing every detected field
+as `#n / Label / Semantic / Confidence` with its band and match reason, plus the
+page classification — the primary tool for developing the universal engine.
+
+### Fixtures
+
+`tests/fixtures/` holds synthetic, non-proprietary forms: `simple`,
+`random-fields`, `react-like`, `dynamic-form`, `shadow-dom`, `multi-step`,
+`ambiguous-form`, `unknown-ats`, `lever-like`, `contact-form`, `job-listing`.
+
 ## Message protocol
 
 `extension/src/utils/messaging.ts` wraps `chrome.runtime` / `chrome.tabs` messaging
@@ -146,8 +239,9 @@ rules.
   into `dist/`.
 - Vitest runs in a Node environment with the same path aliases as the app
   (`@schemas`, `@ai`, `@shared`, `@`). DOM-dependent suites use `jsdom` plus HTML
-  fixtures in `tests/fixtures/` (simple, dynamic, shadow-DOM, multi-step, unknown-ATS
-  forms) so scanner/classifier/filler behaviour is exercised without a browser.
+  fixtures in `tests/fixtures/` (simple, random-fields, react-like, dynamic,
+  shadow-DOM, multi-step, ambiguous, unknown-ATS, contact, job-listing forms)
+  so scanner/classifier/filler behaviour is exercised without a browser.
 - Resume suites run against a realistic fixture resume
   (`tests/fixtures/resumes/sample-resume.txt`) covering the whole pipeline.
 
