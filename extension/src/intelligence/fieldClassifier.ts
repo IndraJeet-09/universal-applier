@@ -4,6 +4,7 @@ import {
   normalizeText,
   categoryForKey,
 } from './taxonomy';
+import { isClassifiable } from './confidence';
 
 export type MatchMethod =
   | 'autocomplete'
@@ -13,7 +14,8 @@ export type MatchMethod =
   | 'type_context'
   | 'section_context'
   | 'ai'
-  | 'cache';
+  | 'cache'
+  | 'none';
 
 export interface Classification {
   semanticField: string;
@@ -101,7 +103,7 @@ const UNKNOWN: Classification = {
   semanticField: 'unknown',
   category: 'unknown',
   confidence: 0,
-  method: 'exact_synonym',
+  method: 'none',
   reason: 'no deterministic match',
 };
 
@@ -334,7 +336,8 @@ export function classifyField(field: SemanticField): Classification {
     best = contextBest;
   }
 
-  return best ?? UNKNOWN;
+  if (!best || !isClassifiable(best.confidence)) return UNKNOWN;
+  return best;
 }
 
 function runStrategies(strategies: Array<() => Classification | null>): Classification | null {

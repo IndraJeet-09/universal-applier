@@ -9,11 +9,58 @@ export interface DecisionContext {
   skipSensitiveFields: boolean;
 }
 
+/**
+ * Confidence bands for semantic classifications:
+ *
+ *   Exact autocomplete / exact label   >= 0.97   -> "exact"
+ *   Strong synonym                     >= 0.90   -> "strong"
+ *   Contextual match                   >= 0.75   -> "contextual"
+ *   Weak inference                     >= 0.60   -> "weak"
+ *   Unknown                            <  0.60   -> discarded
+ */
+export const UNKNOWN_MIN_CONFIDENCE = 0.6;
+
+export const CLASSIFICATION_BANDS = {
+  exact: 0.97,
+  strong: 0.9,
+  contextual: 0.75,
+  weak: UNKNOWN_MIN_CONFIDENCE,
+} as const;
+
+export type ClassificationBand = 'exact' | 'strong' | 'contextual' | 'weak' | 'unknown';
+
+export function classificationBand(confidence: number): ClassificationBand {
+  if (confidence >= CLASSIFICATION_BANDS.exact) return 'exact';
+  if (confidence >= CLASSIFICATION_BANDS.strong) return 'strong';
+  if (confidence >= CLASSIFICATION_BANDS.contextual) return 'contextual';
+  if (confidence >= CLASSIFICATION_BANDS.weak) return 'weak';
+  return 'unknown';
+}
+
+export function bandDescription(confidence: number): string {
+  switch (classificationBand(confidence)) {
+    case 'exact':
+      return 'exact match';
+    case 'strong':
+      return 'strong synonym';
+    case 'contextual':
+      return 'contextual match';
+    case 'weak':
+      return 'weak inference';
+    default:
+      return 'unknown';
+  }
+}
+
+export function isClassifiable(confidence: number): boolean {
+  return confidence >= UNKNOWN_MIN_CONFIDENCE;
+}
+
 export function decideFill(ctx: DecisionContext): FillDecision {
   const { confidence, sensitive, hasValue } = ctx;
 
   if (!hasValue) return 'skip';
-  if (confidence < 0.6) return 'skip';
+  if (!isClassifiable(confidence)) return 'skip';
 
   if (sensitive) {
     if (ctx.skipSensitiveFields) return 'ask_user';
