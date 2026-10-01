@@ -22,12 +22,51 @@ function textOrNull(el: Element | null): string | undefined {
   return text && text.length > 0 ? text : undefined;
 }
 
+/**
+ * The tree the element lives in: its own document (also for iframe content)
+ * or the shadow root that contains it. Labels must be resolved inside that
+ * tree, since ids are scoped per tree.
+ */
+function rootOf(element: Element): Document | ShadowRoot {
+  const node = element.getRootNode();
+  if (node instanceof Document || node instanceof ShadowRoot) return node;
+  return element.ownerDocument;
+}
+
+function findById(element: Element, id: string): Element | null {
+  try {
+    const local = rootOf(element).getElementById(id);
+    if (local) return local;
+  } catch {
+    /* invalid id */
+  }
+  try {
+    return document.getElementById(id);
+  } catch {
+    return null;
+  }
+}
+
+function queryInRoot(element: Element, selector: string): Element | null {
+  try {
+    const found = rootOf(element).querySelector(selector);
+    if (found) return found;
+  } catch {
+    /* invalid selector */
+  }
+  try {
+    return document.querySelector(selector);
+  } catch {
+    return null;
+  }
+}
+
 function getLabelledByText(element: Element): string | undefined {
   const labelledBy = element.getAttribute('aria-labelledby');
   if (!labelledBy) return undefined;
   const texts: string[] = [];
   for (const id of labelledBy.split(/\s+/)) {
-    const target = document.getElementById(id);
+    const target = findById(element, id);
     const text = textOrNull(target);
     if (text) texts.push(text);
   }
@@ -39,7 +78,7 @@ function getAriaDescription(element: Element): string | undefined {
   if (describedBy) {
     const texts: string[] = [];
     for (const id of describedBy.split(/\s+/)) {
-      const target = document.getElementById(id);
+      const target = findById(element, id);
       const text = textOrNull(target);
       if (text) texts.push(text);
     }
@@ -78,13 +117,9 @@ function textFromPreviousSibling(element: Element): string | undefined {
 
 export function getAssociatedLabel(element: HTMLElement): string | undefined {
   if (element.id) {
-    try {
-      const byFor = document.querySelector(`label[for="${cssEscape(element.id)}"]`);
-      const text = textOrNull(byFor);
-      if (text) return text;
-    } catch {
-      /* invalid id selector */
-    }
+    const byFor = queryInRoot(element, `label[for="${cssEscape(element.id)}"]`);
+    const text = textOrNull(byFor);
+    if (text) return text;
   }
 
   const wrapperLabel = element.closest('label');
@@ -152,7 +187,7 @@ function extractOptions(element: Element): string[] | undefined {
   const role = element.getAttribute('role');
   if (role === 'listbox' || role === 'combobox') {
     const listId = element.getAttribute('aria-controls') ?? element.getAttribute('aria-owns');
-    const list = listId ? document.getElementById(listId) : element.querySelector('[role="option"], option');
+    const list = listId ? findById(element, listId) : element.querySelector('[role="option"], option');
     if (list) {
       const options = Array.from(list.querySelectorAll('[role="option"], option'))
         .map((o) => o.textContent?.trim() ?? '')
