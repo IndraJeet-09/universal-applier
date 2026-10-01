@@ -20,7 +20,3 @@ export function collectShadowRoots(root: Document | ShadowRoot, depth = 0): Shad
 
   return shadowRoots;
 }
-
-export function collectRoots(): Array<Document | ShadowRoot> {
-  return [document, ...collectShadowRoots(document)];
-}
