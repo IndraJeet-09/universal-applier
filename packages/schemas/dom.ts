@@ -32,11 +32,21 @@ export interface FormSection {
   fields: SemanticField[];
 }
 
+export type PageType =
+  | 'NOT_JOB_PAGE'
+  | 'JOB_LISTING'
+  | 'APPLICATION_FORM'
+  | 'APPLICATION_STEP'
+  | 'UNKNOWN';
+
 export interface FormAnalysis {
   url: string;
   timestamp: string;
   formType: 'application' | 'login' | 'signup' | 'contact' | 'unknown';
   isJobApplication: boolean;
+  pageType?: PageType;
+  pageConfidence?: number;
+  pageReasons?: string[];
   jobContext?: JobContext;
   sections: FormSection[];
   totalFields: number;

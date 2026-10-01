@@ -3,6 +3,11 @@ import { computeFingerprint } from '@schemas/dom';
 import { queryInteractive } from './domScanner';
 import { extractSignals } from './fieldExtractor';
 import { collectRoots } from './rootCollector';
+import {
+  classifyPage,
+  fieldsToSignals,
+  type PageSignals,
+} from '../intelligence/pageClassifier';
 import { createLogger } from '../utils/logger';
 import { cssEscape } from '../utils/dom';
 
@@ -118,6 +123,37 @@ export function extractPageText(maxChars = 20000): string {
   return visiblePageText().slice(0, maxChars);
 }
 
+function collectTexts(selector: string, max: number): string[] {
+  try {
+    const nodes = Array.from(document.querySelectorAll(selector));
+    return nodes
+      .map((el) => {
+        const direct = (el as HTMLElement).innerText;
+        const value = typeof direct === 'string' && direct.trim().length > 0 ? direct : (el.textContent ?? '');
+        return value.replace(/\s+/g, ' ').trim();
+      })
+      .filter((t) => t.length > 0 && t.length <= 140)
+      .slice(0, max);
+  } catch {
+    return [];
+  }
+}
+
+/** Compact page-level signals — never the whole DOM — for the page classifier. */
+export function collectPageSignals(fields: SemanticField[], text: string): PageSignals {
+  return {
+    url: window.location.href,
+    title: document.title ?? '',
+    headings: collectTexts('h1, h2, [role="heading"]', 12),
+    text,
+    controls: collectTexts(
+      'button, [role="button"], input[type="submit"], input[type="button"], a',
+      40
+    ),
+    fields: fieldsToSignals(fields),
+  };
+}
+
 export function detectJobContext(text: string): JobContext | undefined {
   const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
   const context: JobContext = {};
@@ -223,6 +259,7 @@ export function analyzeForm(): FormAnalysis {
   const fields = scanFields();
   const text = extractPageText();
   const formType = classifyForm(fields);
+  const page = classifyPage(collectPageSignals(fields, text));
   const jobContext = formType === 'application' ? detectJobContext(text) : undefined;
 
   const analysis: FormAnalysis = {
@@ -230,6 +267,9 @@ export function analyzeForm(): FormAnalysis {
     timestamp: new Date().toISOString(),
     formType,
     isJobApplication: formType === 'application',
+    pageType: page.pageType,
+    pageConfidence: page.confidence,
+    pageReasons: page.reasons,
     jobContext,
     sections: groupIntoSections(fields),
     totalFields: fields.length,
@@ -241,6 +281,8 @@ export function analyzeForm(): FormAnalysis {
 
   log.info('form analyzed', {
     formType,
+    pageType: page.pageType,
+    pageConfidence: page.confidence,
     fields: analysis.totalFields,
     fingerprint: analysis.fingerprint,
   });
