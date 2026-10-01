@@ -1,5 +1,6 @@
 import type { SemanticField } from '@schemas/dom';
 import { scanFields } from './semanticExtractor';
+import { collectRoots } from './rootCollector';
 
 export interface RegistryEntry {
   field: SemanticField;
@@ -10,15 +11,13 @@ let entries: RegistryEntry[] = [];
 let lastScanAt = 0;
 
 function resolveElement(field: SemanticField): Element | undefined {
-  try {
-    if (field.selector.startsWith('#')) {
-      const el = document.querySelector(field.selector);
+  for (const root of collectRoots()) {
+    try {
+      const el = root.querySelector(field.selector);
       if (el) return el;
+    } catch {
+      /* invalid selector for this root */
     }
-    const el = document.querySelector(field.selector);
-    if (el) return el;
-  } catch {
-    /* invalid selector */
   }
   return undefined;
 }
