@@ -226,6 +226,10 @@ export function resolveValue(
       const v = profile.skills.frameworks;
       return v.length > 0 ? ok(semanticField, v.join(', '), 'skills.frameworks') : fallback('no frameworks');
     }
+    case 'databases': {
+      const v = profile.skills.databases;
+      return v.length > 0 ? ok(semanticField, v.join(', '), 'skills.databases') : fallback('no databases');
+    }
 
     case 'cover_letter':
     case 'why_company':
