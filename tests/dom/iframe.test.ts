@@ -4,13 +4,17 @@ import { scanFields } from '../../extension/src/content/semanticExtractor';
 import { collectRoots, getLastIframeReport } from '../../extension/src/content/rootCollector';
 import { collectIframes } from '../../extension/src/content/iframeScanner';
 
-beforeEach(() => {
-  Element.prototype.getBoundingClientRect = function getBoundingClientRect(): DOMRect {
+function stubRect(win: Window & typeof globalThis): void {
+  win.Element.prototype.getBoundingClientRect = function getBoundingClientRect(): DOMRect {
     return {
       x: 0, y: 0, top: 0, left: 0, right: 100, bottom: 20,
       width: 100, height: 20, toJSON: () => ({}),
     } as DOMRect;
   };
+}
+
+beforeEach(() => {
+  stubRect(window);
   document.title = '';
   document.body.innerHTML = '';
 });
@@ -22,12 +26,19 @@ function makeFrame(src?: string): HTMLIFrameElement {
   return frame;
 }
 
-function frameBody(frame: HTMLIFrameElement, html: string): Document {
-  const doc = frame.contentDocument;
+function writeInto(doc: Document, html: string): Document {
   doc.open();
   doc.write(html);
   doc.close();
+  const win = doc.defaultView;
+  if (win) stubRect(win);
   return doc;
+}
+
+function frameBody(frame: HTMLIFrameElement, html: string): Document {
+  const doc = frame.contentDocument;
+  if (!doc) throw new Error('frame document unavailable');
+  return writeInto(doc, html);
 }
 
 describe('iframe scanning', () => {
@@ -58,7 +69,8 @@ describe('iframe scanning', () => {
   });
 
   it('records cross-origin style inaccessible iframes without crashing', () => {
-    document.body.innerHTML = '<label for="top-email">Email</label><input id="top-email" name="email" />';
+    document.body.innerHTML =
+      '<label for="top-email">Email</label><input id="top-email" name="email" />';
 
     const blocked = makeFrame('https://cross-origin.example/embed');
     Object.defineProperty(blocked, 'contentDocument', {
@@ -93,12 +105,10 @@ describe('iframe scanning', () => {
 
     const inner = outerDoc.createElement('iframe');
     outerDoc.body.appendChild(inner);
-    const innerDoc = inner.contentDocument;
-    innerDoc.open();
-    innerDoc.write(
+    const innerDoc = frameBody(
+      inner,
       `<label for="in-phone">Phone Number</label><input type="tel" id="in-phone" name="phone" />`
     );
-    innerDoc.close();
 
     const roots = collectRoots();
     expect(roots).toContain(outerDoc);
@@ -110,7 +120,8 @@ describe('iframe scanning', () => {
   });
 
   it('does not scan fields of inaccessible iframes but keeps scanning the page', () => {
-    document.body.innerHTML = '<label for="keep">GitHub Profile</label><input id="keep" name="github_url" />';
+    document.body.innerHTML =
+      '<label for="keep">GitHub Profile</label><input id="keep" name="github_url" />';
     const blocked = makeFrame('https://locked.example/apply');
     Object.defineProperty(blocked, 'contentDocument', {
       configurable: true,
