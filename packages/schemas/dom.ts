@@ -149,13 +149,20 @@ export interface FieldFingerprint {
   domPath: string;
 }
 
+/**
+ * Stable identity of a field across rescans.
+ *
+ * Only structural signals are hashed — deliberately excluding volatile text
+ * such as surrounding copy, which changes whenever unrelated parts of the
+ * page mutate. The same untouched field keeps the same fingerprint (and thus
+ * the same id) across repeated scans, so rescans never reprocess it as new.
+ */
 export function computeFingerprint(field: SemanticField): string {
   const parts = [
     field.label || '',
     field.name || '',
     field.placeholder || '',
     field.type || '',
-    field.surroundingText || '',
     field.section || '',
   ];
   const str = parts.join('|').toLowerCase().trim();

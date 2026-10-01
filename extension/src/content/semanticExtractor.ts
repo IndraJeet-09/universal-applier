@@ -13,14 +13,27 @@ import { cssEscape } from '../utils/dom';
 
 const log = createLogger('semantic');
 
-let fieldCounter = 0;
+/**
+ * Ids are derived from the field fingerprint so an untouched field keeps the
+ * same id across rescans. Duplicate fingerprints (identical fields in the same
+ * scan) are disambiguated by document order, which is stable for a stable DOM.
+ */
+function stableId(fingerprint: string, usedIds: Set<string>): string {
+  let id = `field-${fingerprint}`;
+  let duplicate = 2;
+  while (usedIds.has(id)) {
+    id = `field-${fingerprint}-${duplicate}`;
+    duplicate += 1;
+  }
+  usedIds.add(id);
+  return id;
+}
 
-function toSemanticField(element: Element, selector: string): SemanticField {
+function toSemanticField(element: Element, selector: string, usedIds: Set<string>): SemanticField {
   const signals = extractSignals(element);
-  fieldCounter += 1;
 
   const field: SemanticField = {
-    id: `f${fieldCounter}-${Date.now().toString(36)}`,
+    id: '',
     selector,
     elementType: signals.type,
     label: signals.label,
@@ -41,6 +54,7 @@ function toSemanticField(element: Element, selector: string): SemanticField {
     fingerprint: '',
   };
   field.fingerprint = computeFingerprint(field);
+  field.id = stableId(field.fingerprint, usedIds);
   return field;
 }
 
@@ -75,12 +89,13 @@ export function buildSelector(element: Element): string {
 export function scanFields(): SemanticField[] {
   const fields: SemanticField[] = [];
   const seen = new WeakSet<Element>();
+  const usedIds = new Set<string>();
 
   for (const root of collectRoots()) {
     for (const element of queryInteractive(root)) {
       if (seen.has(element)) continue;
       seen.add(element);
-      fields.push(toSemanticField(element, buildSelector(element)));
+      fields.push(toSemanticField(element, buildSelector(element), usedIds));
     }
   }
 
