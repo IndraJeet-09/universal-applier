@@ -229,6 +229,13 @@ export default function App() {
               const next = !settings.debugMode;
               setSettings({ ...settings, debugMode: next });
               void sendMessage('set-settings', { debugMode: next });
+              if (pageStatus.tabId) {
+                void sendMessage('set-debug', { enabled: next }, { tabId: pageStatus.tabId }).catch(
+                  () => {
+                    /* content script may not be present on this page */
+                  }
+                );
+              }
             }}
             className="hover:text-gray-900"
           >

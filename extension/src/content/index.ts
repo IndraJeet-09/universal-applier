@@ -3,7 +3,7 @@ import type { AutofillResult, AutofillSettings, FilledField } from '@schemas/app
 import type { CandidateProfile } from '@schemas/candidate';
 import type { FieldClassificationInput, FieldClassificationOutput } from '@schemas/ai';
 import { registerHandlers, sendMessage } from '../utils/messaging';
-import { createLogger, setDebugMode } from '../utils/logger';
+import { createLogger, setDebugMode, isDebugMode } from '../utils/logger';
 import { analyzeForm } from './semanticExtractor';
 import { refreshRegistry, getRegistry } from './fieldRegistry';
 import { observeFormChanges, stopObserving } from './mutationObserver';
@@ -14,6 +14,7 @@ import {
 } from '../intelligence/fillPlanner';
 import { executeFillPlan, applyUserEdit, type FileToUpload } from './formFiller';
 import { createReviewPanel, type ReviewPanel } from './reviewPanel';
+import { createDebugPanel, buildDebugData, type DebugPanel } from './debugPanel';
 import type { Classification } from '../intelligence/fieldClassifier';
 
 const log = createLogger('content');
@@ -21,7 +22,46 @@ const log = createLogger('content');
 let lastAnalysis: FormAnalysis | null = null;
 let lastPlan: FillPlan | null = null;
 let reviewPanel: ReviewPanel | null = null;
+let debugPanel: DebugPanel | null = null;
 let observing = false;
+
+function showDebugPanel(): { count: number } {
+  const fields = getRegistry().map((entry) => entry.field);
+  const data = buildDebugData(fields, lastAnalysis ?? undefined);
+  if (debugPanel) {
+    debugPanel.update(data);
+    return { count: fields.length };
+  }
+  debugPanel = createDebugPanel(data, {
+    onClose: () => {
+      debugPanel = null;
+    },
+  });
+  document.documentElement.appendChild(debugPanel.element);
+  log.debug('debug panel shown', { fields: fields.length });
+  return { count: fields.length };
+}
+
+function hideDebugPanel(): { closed: boolean } {
+  if (debugPanel) {
+    debugPanel.destroy();
+    debugPanel = null;
+  }
+  return { closed: true };
+}
+
+let debugPreferenceSynced = false;
+
+async function syncDebugPreference(): Promise<void> {
+  if (debugPreferenceSynced) return;
+  debugPreferenceSynced = true;
+  try {
+    const settings = await sendMessage<void, AutofillSettings>('get-settings');
+    setDebugMode(settings.debugMode);
+  } catch {
+    /* background unavailable — keep current debug state */
+  }
+}
 
 type ClassifyRequest = {
   field: FieldClassificationInput['field'];
@@ -101,10 +141,12 @@ registerHandlers({
   },
 
   async 'analyze-form'() {
+    await syncDebugPreference();
     const analysis = analyzeForm();
     lastAnalysis = analysis;
     refreshRegistry();
     startObserving();
+    if (isDebugMode()) showDebugPanel();
     return analysis;
   },
 
@@ -117,6 +159,7 @@ registerHandlers({
     const analysis = analyzeForm();
     lastAnalysis = analysis;
     lastPlan = null;
+    if (isDebugMode()) showDebugPanel();
     return { analysis, fields };
   },
 
@@ -128,7 +171,26 @@ registerHandlers({
 
   async 'set-debug'(payload: { enabled: boolean }) {
     setDebugMode(payload.enabled);
-    return { enabled: payload.enabled };
+    if (payload.enabled) {
+      refreshRegistry();
+      return { enabled: payload.enabled, ...showDebugPanel() };
+    }
+    return { enabled: payload.enabled, ...hideDebugPanel() };
+  },
+
+  async 'show-debug-panel'() {
+    refreshRegistry();
+    return showDebugPanel();
+  },
+
+  async 'hide-debug-panel'() {
+    return hideDebugPanel();
+  },
+
+  async 'toggle-debug-panel'() {
+    if (debugPanel) return { ...hideDebugPanel(), visible: false };
+    refreshRegistry();
+    return { ...showDebugPanel(), visible: true };
   },
 
   async 'build-fill-plan'(): Promise<FillPlan> {
@@ -197,6 +259,7 @@ function startObserving(): void {
     const added = mutations.reduce((sum, m) => sum + m.addedNodes.length, 0);
     log.debug('dom changed, re-scanning', { addedNodes: added });
     const fields = refreshRegistry();
+    if (isDebugMode() && debugPanel) showDebugPanel();
     void chrome.runtime
       .sendMessage({ type: 'content-fields-updated', payload: { count: fields.length } })
       .catch(() => {
@@ -208,6 +271,7 @@ function startObserving(): void {
 export function stopContentObserving(): void {
   stopObserving();
   observing = false;
+  hideDebugPanel();
 }
 
 log.info('content script loaded', { url: window.location.href });
