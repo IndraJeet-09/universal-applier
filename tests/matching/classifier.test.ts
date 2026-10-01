@@ -155,6 +155,29 @@ describe('deterministic classification — ambiguous-form.html', () => {
   });
 });
 
+describe('deterministic classification — random-fields.html', () => {
+  beforeEach(() => loadFixture('random-fields.html'));
+
+  it('classifies fields that have no usable name or id', () => {
+    expectField('Full name', 'full_name', 0.9);
+    expectField('Work e-mail', 'email', 0.85);
+    expectField('Best contact number', 'phone', 0.85);
+    expectField('Years of relevant experience', 'years_experience', 0.85);
+    expectField('Mailing city', 'city', 0.85);
+    expectField('review your code', 'github', 0.8);
+    expectField('LinkedIn profile', 'linkedin', 0.85);
+  });
+
+  it('classifies the sponsorship question from surrounding context', () => {
+    const fields = scanFields();
+    const select = fields.find((f) => f.type === 'select');
+    expect(select).toBeDefined();
+    const result = classifyField(select!);
+    expect(result.semanticField).toBe('requires_sponsorship');
+    expect(result.confidence).toBeGreaterThanOrEqual(0.8);
+  });
+});
+
 describe('section grouping sanity', () => {
   beforeEach(() => loadFixture('simple.html'));
 

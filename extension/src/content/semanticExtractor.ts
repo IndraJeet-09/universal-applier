@@ -273,8 +273,12 @@ export function computeFormFingerprint(fields: SemanticField[]): string {
 export function analyzeForm(): FormAnalysis {
   const fields = scanFields();
   const text = extractPageText();
-  const formType = classifyForm(fields);
   const page = classifyPage(collectPageSignals(fields, text));
+  const rawFormType = classifyForm(fields);
+  const applicationPage =
+    page.pageType === 'APPLICATION_FORM' || page.pageType === 'APPLICATION_STEP';
+  const formType: FormAnalysis['formType'] =
+    rawFormType === 'unknown' && applicationPage ? 'application' : rawFormType;
   const jobContext = formType === 'application' ? detectJobContext(text) : undefined;
 
   const analysis: FormAnalysis = {

@@ -196,3 +196,80 @@ describe('scanFields — multi-step visibility', () => {
     expect(analyzeForm().formType).toBe('application');
   });
 });
+
+describe('scanFields — random-fields.html (no usable names or ids)', () => {
+  beforeEach(() => loadFixture('random-fields.html'));
+
+  it('extracts every field via aria metadata, placeholders and context', () => {
+    const fields = scanFields();
+    expect(fields.length).toBeGreaterThanOrEqual(8);
+
+    expect(fields.find((f) => f.label === 'Full name')).toBeDefined();
+    expect(fields.find((f) => f.label === 'Work e-mail')).toBeDefined();
+    expect(fields.find((f) => f.placeholder === 'Best contact number')).toBeDefined();
+    expect(fields.some((f) => f.name === undefined)).toBe(true);
+
+    const sponsorship = fields.find((f) => f.type === 'select');
+    expect(sponsorship?.surroundingText).toContain('visa sponsorship');
+  });
+
+  it('classifies the page as an application form', () => {
+    const analysis = analyzeForm();
+    expect(analysis.formType).toBe('application');
+    expect(analysis.pageType).toBe('APPLICATION_FORM');
+  });
+});
+
+describe('scanFields — dynamic-form.html visibility changes', () => {
+  beforeEach(() => loadFixture('dynamic-form.html'));
+
+  it('picks up fields when hidden sections become visible', () => {
+    const before = scanFields();
+    expect(before.some((f) => f.name === 'visa_sponsorship')).toBe(false);
+
+    document.getElementById('advanced-section')!.removeAttribute('hidden');
+
+    const after = scanFields();
+    expect(after.length).toBe(before.length + 1);
+    const visa = after.find((f) => f.name === 'visa_sponsorship');
+    expect(visa?.label).toBe('Do you require visa sponsorship?');
+  });
+
+  it('picks up fields appended by scripts', () => {
+    const before = scanFields();
+    document
+      .getElementById('experience-list')!
+      .insertAdjacentHTML(
+        'beforeend',
+        '<label for="exp-co">Company</label><input type="text" id="exp-co" name="company" />'
+      );
+    const after = scanFields();
+    expect(after.length).toBe(before.length + 1);
+    expect(after.find((f) => f.name === 'company')?.label).toBe('Company');
+  });
+});
+
+describe('scanFields — ambiguous-form.html', () => {
+  beforeEach(() => loadFixture('ambiguous-form.html'));
+
+  it('captures question context for unlabelled radio groups', () => {
+    const fields = scanFields();
+    const radios = fields.filter((f) => f.type === 'radio');
+    expect(radios).toHaveLength(4);
+
+    const auth = fields.filter((f) => f.name === 'field_2');
+    expect(auth).toHaveLength(2);
+    expect(auth[0].label).toBe('Yes');
+    expect(auth[1].label).toBe('No');
+    expect(auth[0].surroundingText).toContain('legally authorized to work');
+
+    const sponsor = fields.filter((f) => f.name === 'field_3');
+    expect(sponsor[0].surroundingText).toContain('visa sponsorship');
+  });
+
+  it('classifies as job application', () => {
+    const analysis = analyzeForm();
+    expect(analysis.formType).toBe('application');
+    expect(analysis.pageType).toBe('APPLICATION_FORM');
+  });
+});

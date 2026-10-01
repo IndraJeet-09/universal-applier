@@ -314,6 +314,10 @@ export function classifyField(field: SemanticField): Classification {
     () => classifyByTypeContext(field),
     () => classifyByAutocomplete(field),
     () => (field.label ? classifyBySynonyms('label', field.label) : null),
+    () =>
+      field.ariaLabel && field.ariaLabel !== field.label
+        ? classifyBySynonyms('label', field.ariaLabel)
+        : null,
     () => classifyByPrimaryHeuristics(field),
     () => (field.name ? classifyBySynonyms('name', field.name) : null),
     () => (field.placeholder ? classifyBySynonyms('placeholder', field.placeholder) : null),
