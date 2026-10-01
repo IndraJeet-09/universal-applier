@@ -38,6 +38,7 @@ export const TAXONOMY: TaxonomyField[] = [
   { key: 'skills', category: 'skills' },
   { key: 'programming_languages', category: 'skills' },
   { key: 'frameworks', category: 'skills' },
+  { key: 'databases', category: 'skills' },
 
   { key: 'cover_letter', category: 'application' },
   { key: 'why_company', category: 'application' },
@@ -147,6 +148,7 @@ export const SYNONYMS: Record<string, string[]> = {
   ],
   programming_languages: ['programming languages', 'languages', 'languages known'],
   frameworks: ['frameworks', 'frameworks and libraries', 'technologies'],
+  databases: ['databases', 'database', 'database technologies', 'databases known', 'rdbms'],
 
   cover_letter: ['cover letter', 'cover letter text', 'letter of motivation'],
   why_company: [

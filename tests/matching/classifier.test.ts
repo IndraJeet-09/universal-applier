@@ -178,6 +178,25 @@ describe('deterministic classification — random-fields.html', () => {
   });
 });
 
+describe('skill taxonomy coverage', () => {
+  it('classifies database skill fields', () => {
+    const field: SemanticField = {
+      id: 'f-db',
+      selector: '#db',
+      elementType: 'text',
+      type: 'text',
+      label: 'Databases',
+      required: false,
+      visible: true,
+      disabled: false,
+      fingerprint: 'db',
+    };
+    const result = classifyField(field);
+    expect(result.semanticField).toBe('databases');
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9);
+  });
+});
+
 describe('section grouping sanity', () => {
   beforeEach(() => loadFixture('simple.html'));
 
