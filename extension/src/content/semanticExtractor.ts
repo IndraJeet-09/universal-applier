@@ -2,7 +2,7 @@ import type { SemanticField, FormSection, FormAnalysis, JobContext } from '@sche
 import { computeFingerprint } from '@schemas/dom';
 import { queryInteractive } from './domScanner';
 import { extractSignals } from './fieldExtractor';
-import { collectRoots } from './shadowDomScanner';
+import { collectRoots } from './rootCollector';
 import { createLogger } from '../utils/logger';
 import { cssEscape } from '../utils/dom';
 
