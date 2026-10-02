@@ -228,6 +228,25 @@ export function isSensitiveKey(key: string): boolean {
   return TAXONOMY.find((t) => t.key === key)?.sensitive === true;
 }
 
+const DECLARATION_PATTERNS: RegExp[] = [
+  /\bi\s+(certify|confirm|acknowledge|declare|agree|consent)\b/i,
+  /\b(certify|declare)\b.*\b(accurate|true|correct)\b/i,
+  /\ball\s+(information|details|statements?)\b.*\b(accurate|true|correct)\b/i,
+  /\bterms\s+(of\s+service|and\s+conditions|of\s+use)\b/i,
+  /\bprivacy\s+policy\b/i,
+  /\baccuracy\s+of\s+(the\s+)?information\b/i,
+  /\bdeclaration\b/i,
+];
+
+/**
+ * Legal declarations and certification statements are never accepted on the
+ * user's behalf — they require an explicit human confirmation.
+ */
+export function isLegalDeclaration(text: string): boolean {
+  if (!text) return false;
+  return DECLARATION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 export function categoryForKey(key: string): FieldCategory {
   return CATEGORY_BY_KEY[key] ?? 'unknown';
 }
