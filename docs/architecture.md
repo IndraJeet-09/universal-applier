@@ -130,8 +130,82 @@ page classification — the primary tool for developing the universal engine.
 ### Fixtures
 
 `tests/fixtures/` holds synthetic, non-proprietary forms: `simple`,
-`random-fields`, `react-like`, `dynamic-form`, `shadow-dom`, `multi-step`,
-`ambiguous-form`, `unknown-ats`, `lever-like`, `contact-form`, `job-listing`.
+`random-fields`, `react-like`, `react-controlled`, `dynamic-form`, `shadow-dom`,
+`multi-step`, `ambiguous-form`, `unknown-ats`, `lever-like`, `contact-form`,
+`job-listing`, `widgets`, `choice-form`, `captcha-form`.
+
+## Fill execution
+
+Turning a scan into filled fields is a plan → execute → verify pipeline with the
+user in the loop at every decision point:
+
+```text
+SemanticField[] + CandidateProfile
+   ↓  intelligence/candidateMatcher   semantic field → profile value; saved
+   ↓                                  answers win; choice values are re-matched
+   ↓                                  against the field's own options
+   ↓  intelligence/fillPlanner        decideFill: auto_fill (≥0.95) ·
+   ↓                                  fill_highlight (≥0.80) · ask_user (≥0.60) ·
+   ↓                                  skip (unknown or no value)
+   ↓                                  sensitive fields and legal declarations
+   ↓                                  are never auto-filled
+   ↓  FillPlan { actions, mappings, summary }
+   ↓  content/formFiller.ts           write → settle → read back from the DOM
+   ↓  AutofillResult                  filled · failed · skipped · needs_review
+```
+
+### Candidate matching
+
+`intelligence/candidateMatcher.ts` resolves each semantic field against the
+profile. Choice questions are answered by *meaning*, not by stored strings:
+
+- radio/option labels decide yes/no — a `value="1"` never tells us which option
+  means "Yes";
+- degree spellings are equated (`B.Tech` ≡ `Bachelor of Technology` ≡
+  `Bachelor's` by level and signature);
+- sensitive work-authorization answers come only from explicit profile data;
+  legal declarations ("I certify …") resolve to nothing and stay skipped until
+  the user confirms them personally.
+
+### Write strategies and verification
+
+Text controls are written with the prototype setter (native), then with the
+value tracker reset (React's tracker swallows duplicate change events), then
+directly — at most three attempts, never an open loop. After each write the
+filler yields to the framework (microtask + timers), reads the value back and
+only then records `filled`; a value the page reverted is reported as `failed`
+with the attempt count and the read-back error. Selects, radios and checkboxes
+are matched by label meaning, custom ARIA comboboxes are opened and their
+options clicked, `contenteditable` regions are set directly, and file inputs are
+filled through `DataTransfer`.
+
+A session history (`fingerprint → value`) passed into `executeFillPlan` keeps
+rescans and multi-step forms from rewriting fields already filled in this
+session.
+
+### Highlights
+
+Every touched field gets a temporary marker — `filled` (green), `review`
+(yellow), `failed` (red), `skipped` (gray) plus a dashed `pending` outline for
+`ask_user` fields — through `data-ua-highlight` / `data-ua-pending` and an
+injected stylesheet that is removed once no marks remain. Marks also expire
+automatically after a few seconds, so the page keeps no permanent styling.
+
+### Review flow
+
+The popup's **Review & Fill** opens `content/summaryPanel.ts`: counts
+(confident / uncertain / need input), the CAPTCHA notice when present, the full
+field → value mapping with status chips, and then the execution results. The
+per-field `content/reviewPanel.ts` lets the user confirm or edit values;
+`applyUserEdit` reuses the same write-and-verify path marked `method: "user"`.
+Nothing is ever submitted for the user — the final button says so explicitly.
+
+### CAPTCHA
+
+`content/captcha.ts` only *detects* reCAPTCHA / hCaptcha / Turnstile markers and
+the challenge copy, and reports it as `FormAnalysis.captchaDetected` with
+"please complete it manually". The extension never solves, bypasses or tampers
+with a challenge.
 
 ## Message protocol
 

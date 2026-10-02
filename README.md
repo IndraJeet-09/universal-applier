@@ -40,7 +40,31 @@ The universal DOM intelligence engine (Part 2) is complete:
 
 Fill execution builds on that engine (Part 3): semantic scan → fill plan →
 execution → in-page review, with AI used only for fields the deterministic tiers
-cannot resolve confidently.
+cannot resolve confidently. It is complete:
+
+- Candidate matcher: semantic field → profile value, with saved answers winning
+  and choice questions answered by *meaning* (labels decide Yes/No, `B.Tech` ≡
+  `Bachelor of Technology`), never by stored option strings
+- Fill planner: confidence → decision (`auto_fill` / `fill_highlight` /
+  `ask_user` / `skip`); sensitive fields and legal declarations are never
+  auto-filled; the `FieldMapping` list backs every review UI
+- Form filler with bounded write strategies (native → tracker-reset → direct,
+  max 3 attempts), covering React controlled inputs, selects, radios,
+  checkboxes, contenteditable editors, custom ARIA comboboxes and file uploads
+- Read-back verification: a field is only reported `filled` once the DOM holds
+  the value; reverted values surface as `failed` with the attempt count
+- MutationObserver-driven fill for dynamic and multi-step forms, with session
+  history so rescans never rewrite fields already filled
+- CAPTCHA detection only — reported for manual completion, never solved or
+  bypassed
+- Highlight lifecycle (filled / review / failed / skipped / pending) with
+  auto-expiry; the injected stylesheet is removed when no marks remain
+- In-page summary panel: detected counts → mapping review → fill → verification
+  results, and a per-field review panel for confirmed edits — nothing is ever
+  submitted for you
+- Integration tests over synthetic fixtures: obfuscated ids, controlled inputs,
+  widgets, label-driven radio/ select answers, dynamic insertion, multi-step
+  navigation-free filling, CAPTCHA and highlight cleanup
 
 ## Getting started
 
@@ -71,7 +95,8 @@ extension/
     background/      MV3 service worker: message hub, AI proxy, storage access
     content/         scanner, field extractor, semantic extractor, root collector
                      (shadow DOM + iframes), field registry, mutation observer,
-                     debug panel, form filler, review panel
+                     debug panel, form filler, review panel, summary panel,
+                     captcha detector
     popup/           toolbar popup (status, candidate summary, autofill actions)
     options/         profile, resume upload, saved answers, settings
     intelligence/    field classifier, page classifier, confidence bands,

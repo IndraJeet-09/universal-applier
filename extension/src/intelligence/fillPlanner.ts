@@ -258,8 +258,11 @@ async function planField(
     ...(rawMatch.profilePath ? { candidatePath: rawMatch.profilePath } : {}),
   };
 
-  if (declaration && decision !== 'skip') {
-    action.reason = 'legal declaration — requires explicit user confirmation';
+  if (declaration) {
+    action.reason =
+      decision === 'skip'
+        ? 'legal declaration — skipped until the user confirms it'
+        : 'legal declaration — requires explicit user confirmation';
   }
 
   if (decision === 'ask_user' || decision === 'fill_highlight') {
