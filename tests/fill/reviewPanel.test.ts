@@ -57,6 +57,10 @@ async function planFor(): Promise<FillPlan> {
   return buildFillPlan(fields, makeProfile(), DEFAULT_AUTOFILL_SETTINGS);
 }
 
+async function flush(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 30));
+}
+
 function reviewableCount(plan: FillPlan): number {
   return plan.actions.filter(
     (a) => a.decision === 'ask_user' || a.decision === 'fill_highlight'
@@ -123,6 +127,7 @@ describe('createReviewPanel', () => {
     expect(input.value).toBe('John A. Doe');
 
     (nameRow!.querySelector('.btn') as HTMLButtonElement).click();
+    await flush();
 
     const nameInput = document.querySelector<HTMLInputElement>('input[name="full_name"]');
     expect(nameInput?.value).toBe('John A. Doe');
@@ -162,6 +167,7 @@ describe('createReviewPanel', () => {
 
     const rows = panel.element.shadowRoot!.querySelectorAll<HTMLElement>('.item');
     (rows[0].querySelector('.btn') as HTMLButtonElement).click();
+    await flush();
     expect(onApply).toHaveBeenCalled();
     expect(rows[0].querySelector('.status')?.textContent).toContain('Failed');
 
