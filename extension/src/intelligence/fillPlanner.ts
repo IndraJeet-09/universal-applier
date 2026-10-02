@@ -1,8 +1,8 @@
 import type { SemanticField } from '@schemas/dom';
 import type { CandidateProfile } from '@schemas/candidate';
-import type { AutofillSettings, ReviewItem } from '@schemas/application';
+import type { AutofillSettings, ReviewItem, FieldMapping } from '@schemas/application';
 import { classifyField, type Classification } from './fieldClassifier';
-import { isSensitiveKey } from './taxonomy';
+import { isSensitiveKey, isLegalDeclaration } from './taxonomy';
 import { resolveValue, matchOption, type ValueSource, type MatchResult } from './candidateMatcher';
 import { decideFill, type FillDecision } from './confidence';
 
