@@ -309,9 +309,62 @@ function resolveExplicitSensitive(field: string, profile: CandidateProfile): Mat
   }
 }
 
-const YES_ALIASES = ['yes', 'y', 'true', '1', 'yeah', 'yep', 'absolutely', 'of course'];
-const NO_ALIASES = ['no', 'n', 'false', '0', 'nope', 'not at all'];
+export type OptionMeaning = 'yes' | 'no' | null;
 
+/**
+ * What an option *means*, independently of how it is written.
+ *
+ * Radio groups and selects frequently encode the same answer as "Yes",
+ * "Absolutely", "I am authorized" or `value="1"` — never trust the raw value.
+ */
+export function optionMeaning(text: string, allowBinaryDigits = false): OptionMeaning {
+  const compact = text.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (compact.length === 0) return null;
+
+  if (allowBinaryDigits && compact === '1') return 'yes';
+  if (allowBinaryDigits && compact === '0') return 'no';
+
+  if (
+    /^(yes|yeah|yep|y|true|absolutely|ofcourse|certainly|definitely)$/.test(compact) ||
+    compact.startsWith('yesi') ||
+    /^i(am|do|will|have|can|should)/.test(compact) ||
+    /^(authorized|eligible|permitted)/.test(compact)
+  ) {
+    return 'yes';
+  }
+  if (
+    /^(no|nope|n|false|never|notatall|none)$/.test(compact) ||
+    compact.startsWith('noi') ||
+    /^i(amnot|donot|dont|willnot|wont|cannot|cant|amunable)/.test(compact) ||
+    /^(unauthorized|ineligible|notpermitted|notauthorized)/.test(compact)
+  ) {
+    return 'no';
+  }
+  return null;
+}
+
+const DEGREE_LEVELS: Array<{ level: string; pattern: RegExp }> = [
+  { level: 'doctorate', pattern: /\b(doctorate|phd|d\.?phil|doctor of)\b/ },
+  { level: 'master', pattern: /\b(master|masters|postgrad|post grad|mba|msc|ms|ma|meng|m tech|pgdiploma|pg diploma)\b/ },
+  { level: 'bachelor', pattern: /\b(bachelor|bachelors|undergrad|under grad|b tech|btech|b e|be|bsc|bs|ba|bca|bba)\b/ },
+  { level: 'diploma', pattern: /\b(diploma|associate|certificate)\b/ },
+];
+
+/** Canonical academic level so "B.Tech" and "Bachelor of Technology" agree. */
+function degreeLevelOf(text: string): string | null {
+  const words = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (words.length === 0) return null;
+  for (const { level, pattern } of DEGREE_LEVELS) {
+    if (pattern.test(words)) return level;
+  }
+  return null;
+}
+
+/**
+ * Match a candidate value against the options actually offered by the page.
+ * Priority: exact → answer meaning (yes/no) → academic level → numeric range
+ * → token overlap. Purely deterministic; no AI for option selection.
+ */
 export function matchOption(options: string[], desired: string): string | null {
   if (options.length === 0) return null;
 
@@ -321,13 +374,27 @@ export function matchOption(options: string[], desired: string): string | null {
   const exact = options.find((o) => normalize(o) === desiredNorm);
   if (exact) return exact;
 
-  const desiredIsYes = YES_ALIASES.includes(desiredNorm);
-  const desiredIsNo = NO_ALIASES.includes(desiredNorm);
+  const desiredMeaning = optionMeaning(desired);
+  if (desiredMeaning) {
+    const meaningMatch = options.find((o) => optionMeaning(o) === desiredMeaning);
+    if (meaningMatch) return meaningMatch;
+  }
 
-  for (const option of options) {
-    const optionNorm = normalize(option);
-    if (desiredIsYes && (optionNorm === 'yes' || optionNorm === 'y' || optionNorm === 'true')) return option;
-    if (desiredIsNo && (optionNorm === 'no' || optionNorm === 'n' || optionNorm === 'false')) return option;
+  const desiredLevel = degreeLevelOf(desired);
+  if (desiredLevel) {
+    const candidates = options.filter((o) => degreeLevelOf(o) === desiredLevel);
+    if (candidates.length === 1) return candidates[0];
+    if (candidates.length > 1) {
+      const tokensDesiredLevel = tokens(desired);
+      let bestLevel: { option: string; score: number } | null = null;
+      for (const option of candidates) {
+        const score = jaccard(tokensDesiredLevel, tokens(option));
+        if (score > 0 && (!bestLevel || score > bestLevel.score)) {
+          bestLevel = { option, score };
+        }
+      }
+      return bestLevel ? bestLevel.option : candidates[0];
+    }
   }
 
   const numeric = Number(desiredNorm);
@@ -338,15 +405,6 @@ export function matchOption(options: string[], desired: string): string | null {
       const open = option.match(/(\d+)\s*\+/);
       if (open && numeric >= Number(open[1])) return option;
     }
-  }
-
-  if (desiredNorm.includes('bachelor') || desiredNorm.includes('undergrad')) {
-    const match = options.find((o) => /bachelor|undergrad|b\.?tech|b\.?e\.?|b\.?s/i.test(o));
-    if (match) return match;
-  }
-  if (desiredNorm.includes('master') || desiredNorm.includes('postgrad')) {
-    const match = options.find((o) => /master|postgrad|m\.?tech|m\.?s|m\.?b\.?a/i.test(o));
-    if (match) return match;
   }
 
   const tokensDesired = tokens(desired);
