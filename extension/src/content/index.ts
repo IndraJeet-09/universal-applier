@@ -14,6 +14,7 @@ import {
 } from '../intelligence/fillPlanner';
 import { executeFillPlan, applyUserEdit, type FileToUpload } from './formFiller';
 import { createReviewPanel, type ReviewPanel } from './reviewPanel';
+import { createSummaryPanel, type SummaryPanel } from './summaryPanel';
 import { createDebugPanel, buildDebugData, type DebugPanel } from './debugPanel';
 import type { Classification } from '../intelligence/fieldClassifier';
 
@@ -22,8 +23,15 @@ const log = createLogger('content');
 let lastAnalysis: FormAnalysis | null = null;
 let lastPlan: FillPlan | null = null;
 let reviewPanel: ReviewPanel | null = null;
+let summaryPanel: SummaryPanel | null = null;
 let debugPanel: DebugPanel | null = null;
 let observing = false;
+
+/**
+ * fingerprint → value written in this session. Lets rescans and multi-step
+ * forms skip fields that are already filled instead of reprocessing them.
+ */
+const fillHistory = new Map<string, string>();
 
 function showDebugPanel(): { count: number } {
   const fields = getRegistry().map((entry) => entry.field);
@@ -211,7 +219,7 @@ registerHandlers({
     if (!lastPlan) {
       throw new Error('no fill plan available; build one first');
     }
-    const result = executeFillPlan(lastPlan, payload ?? {});
+    const result = await executeFillPlan(lastPlan, { ...(payload ?? {}), history: fillHistory });
     log.info('fill executed', {
       filled: result.filledCount,
       failed: result.failedCount,
@@ -224,10 +232,16 @@ registerHandlers({
     if (!lastPlan) throw new Error('no fill plan available; build one first');
     const action = lastPlan.actions.find((a) => a.fieldId === payload.fieldId);
     if (!action) throw new Error(`unknown field ${payload.fieldId}`);
-    const result = applyUserEdit(action, payload.value);
-    if (result.status === 'success') {
+    const result = await applyUserEdit(action, payload.value, { history: fillHistory });
+    if (result.status === 'filled') {
       action.value = payload.value;
       action.decision = 'auto_fill';
+      const mapping = lastPlan.mappings.find((m) => m.fieldId === action.fieldId);
+      if (mapping) {
+        mapping.value = payload.value;
+        mapping.status = 'matched';
+        mapping.source = 'user_input';
+      }
     }
     return result;
   },
@@ -248,6 +262,44 @@ registerHandlers({
   async 'close-review-panel'(): Promise<{ closed: boolean }> {
     reviewPanel?.destroy();
     reviewPanel = null;
+    return { closed: true };
+  },
+
+  async 'show-summary-panel'(): Promise<{ count: number }> {
+    if (!lastPlan) throw new Error('no fill plan available; build one first');
+    summaryPanel?.destroy();
+    summaryPanel = createSummaryPanel(lastPlan, lastAnalysis ?? undefined, {
+      onClose: () => {
+        summaryPanel = null;
+      },
+      onFill: async () => {
+        const result = await executeFillPlan(lastPlan!, { history: fillHistory });
+        log.info('fill executed from summary panel', {
+          filled: result.filledCount,
+          failed: result.failedCount,
+        });
+        return result;
+      },
+      onOpenReview: () => {
+        if (!lastPlan) return;
+        summaryPanel?.destroy();
+        summaryPanel = null;
+        reviewPanel?.destroy();
+        reviewPanel = createReviewPanel(lastPlan, {
+          onClose: () => {
+            reviewPanel = null;
+          },
+        });
+        document.documentElement.appendChild(reviewPanel.element);
+      },
+    });
+    document.documentElement.appendChild(summaryPanel.element);
+    return { count: lastPlan.summary.total };
+  },
+
+  async 'close-summary-panel'(): Promise<{ closed: boolean }> {
+    summaryPanel?.destroy();
+    summaryPanel = null;
     return { closed: true };
   },
 });
