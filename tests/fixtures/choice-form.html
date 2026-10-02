@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Application Form — Choices</title>
+</head>
+<body>
+  <h1>Operations Analyst Application</h1>
+
+  <form id="choice-form">
+    <div class="field">
+      <span id="ch-degree-label">Highest qualification</span>
+      <select id="ch-degree" aria-labelledby="ch-degree-label">
+        <option value="">Select…</option>
+        <option value="btech">B.Tech</option>
+        <option value="bachelors">Bachelor's</option>
+        <option value="full">Bachelor of Technology</option>
+        <option value="undergrad">Undergraduate</option>
+        <option value="masters">Master's</option>
+      </select>
+    </div>
+
+    <fieldset>
+      <legend>Are you authorized to work here?</legend>
+      <label><input type="radio" name="work_auth" value="1" /> Yes</label>
+      <label><input type="radio" name="work_auth" value="0" /> No</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Do you require visa sponsorship?</legend>
+      <label><input type="radio" name="sponsorship" value="1" /> Yes</label>
+      <label><input type="radio" name="sponsorship" value="0" /> No</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Preferred work setup</legend>
+      <label><input type="radio" name="setup" value="rmt" /> Remote</label>
+      <label><input type="radio" name="setup" value="off" /> Office</label>
+    </fieldset>
+
+    <label class="check">
+      <input type="checkbox" id="ch-certify" name="certify" />
+      I certify that all information provided is accurate and complete.
+    </label>
+
+    <button type="submit">Submit application</button>
+  </form>
+</body>
+</html>
