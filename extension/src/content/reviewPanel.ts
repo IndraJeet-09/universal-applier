@@ -3,7 +3,7 @@ import { applyUserEdit } from './formFiller';
 import type { FilledField } from '@schemas/application';
 
 export interface ReviewPanelCallbacks {
-  onApply?: (action: PlannedFill, value: string) => FilledField;
+  onApply?: (action: PlannedFill, value: string) => FilledField | Promise<FilledField>;
   onDismiss?: (action: PlannedFill) => void;
   onClose?: () => void;
 }
@@ -185,22 +185,33 @@ export function createReviewPanel(
     fillButton.addEventListener('click', () => {
       const value = input.value.trim();
       if (!value) return;
-      const result = apply(action, value);
-      if (result.status === 'success') {
-        action.value = value;
-        action.decision = 'auto_fill';
-        item.classList.add('applied');
-        item.classList.remove('dismissed');
-        input.disabled = true;
-        fillButton.disabled = true;
-        dismissButton.disabled = true;
-        status.textContent = 'Filled ✓';
-        applied += 1;
-        refreshCount();
-      } else {
-        status.textContent = result.error ? `Failed: ${result.error}` : 'Failed';
-        status.style.color = '#dc2626';
-      }
+      fillButton.disabled = true;
+      status.style.color = '';
+      status.textContent = 'Filling…';
+      void Promise.resolve(apply(action, value))
+        .then((result) => {
+          if (result.status === 'filled') {
+            action.value = value;
+            action.decision = 'auto_fill';
+            item.classList.add('applied');
+            item.classList.remove('dismissed');
+            input.disabled = true;
+            fillButton.disabled = true;
+            dismissButton.disabled = true;
+            status.textContent = 'Filled ✓';
+            applied += 1;
+            refreshCount();
+          } else {
+            status.textContent = result.error ? `Failed: ${result.error}` : 'Failed';
+            status.style.color = '#dc2626';
+            fillButton.disabled = false;
+          }
+        })
+        .catch((err: unknown) => {
+          status.textContent = err instanceof Error ? err.message : String(err);
+          status.style.color = '#dc2626';
+          fillButton.disabled = false;
+        });
     });
 
     dismissButton.addEventListener('click', () => {
