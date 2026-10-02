@@ -8,6 +8,7 @@ import {
   fieldsToSignals,
   type PageSignals,
 } from '../intelligence/pageClassifier';
+import { detectCaptcha } from './captcha';
 import { createLogger } from '../utils/logger';
 import { cssEscape } from '../utils/dom';
 
@@ -290,6 +291,7 @@ export function analyzeForm(): FormAnalysis {
     pageConfidence: page.confidence,
     pageReasons: page.reasons,
     jobContext,
+    captchaDetected: detectCaptcha(),
     sections: groupIntoSections(fields),
     totalFields: fields.length,
     fillableFields: fields.filter((f) => !f.disabled).length,
