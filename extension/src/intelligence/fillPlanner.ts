@@ -14,12 +14,16 @@ export interface PlannedFill {
   selector: string;
   kind: 'value' | 'file';
   semanticField: string;
+  /** Human-readable field label shown in review UIs. */
+  label: string;
   category: string;
   sensitive: boolean;
   classification: Classification;
   decision: FillDecision;
   value: string | null;
   valueSource: PlanValueSource | null;
+  /** Profile path the value came from, e.g. `personal.email`. */
+  candidatePath?: string;
   confidence: number;
   reason: string;
   review?: ReviewItem;
@@ -38,6 +42,8 @@ export interface FillPlanSummary {
 
 export interface FillPlan {
   actions: PlannedFill[];
+  /** Semantic field → candidate value mappings, ready for user inspection. */
+  mappings: FieldMapping[];
   summary: FillPlanSummary;
 }
 
@@ -152,6 +158,7 @@ async function planField(
     fieldId: field.id,
     fingerprint: field.fingerprint,
     selector: field.selector,
+    label: primaryText(field) || field.name || field.selector,
     sensitive: false,
     value: null as string | null,
     valueSource: null as PlanValueSource | null,
@@ -172,7 +179,15 @@ async function planField(
 
   const classification = await classifyWithFallback(field, hooks);
   const semanticField = classification.semanticField;
-  const sensitive = isSensitiveKey(semanticField);
+  const isCheckbox = field.type === 'checkbox' || field.role === 'checkbox';
+  const declarationText = [primaryText(field), field.surroundingText ?? ''].join(' ');
+  /**
+   * Legal declarations ("I certify that all information is accurate") are
+   * treated as sensitive even when the classifier reads them as ordinary
+   * fields, so they can never be accepted automatically.
+   */
+  const declaration = isCheckbox && isLegalDeclaration(declarationText);
+  const sensitive = isSensitiveKey(semanticField) || declaration;
   const isChoice = (field.type !== undefined && CHOICE_TYPES.has(field.type)) || (field.options?.length ?? 0) > 0;
 
   if (classification.category === 'file_upload') {
@@ -240,13 +255,39 @@ async function planField(
     valueSource,
     confidence,
     reason,
+    ...(rawMatch.profilePath ? { candidatePath: rawMatch.profilePath } : {}),
   };
 
+  if (declaration && decision !== 'skip') {
+    action.reason = 'legal declaration — requires explicit user confirmation';
+  }
+
   if (decision === 'ask_user' || decision === 'fill_highlight') {
-    action.review = buildReviewItem(field, classification, value, confidence, reason);
+    action.review = buildReviewItem(field, classification, value, confidence, action.reason);
   }
 
   return action;
+}
+
+function toMapping(action: PlannedFill): FieldMapping {
+  const status: FieldMapping['status'] =
+    action.decision === 'skip'
+      ? 'skipped'
+      : action.decision === 'ask_user' || action.decision === 'fill_highlight'
+        ? 'needs_review'
+        : action.value === null
+          ? 'failed'
+          : 'matched';
+
+  return {
+    fieldId: action.fieldId,
+    semanticField: action.semanticField,
+    ...(action.candidatePath ? { candidatePath: action.candidatePath } : {}),
+    ...(action.value !== null ? { value: action.value } : {}),
+    confidence: action.confidence,
+    ...(action.valueSource ? { source: action.valueSource } : {}),
+    status,
+  };
 }
 
 export async function buildFillPlan(
@@ -271,5 +312,5 @@ export async function buildFillPlan(
     aiClassified: actions.filter((a) => a.classification.method === 'ai').length,
   };
 
-  return { actions, summary };
+  return { actions, mappings: actions.map(toMapping), summary };
 }
