@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Frontend Engineer Application</title>
+</head>
+<body>
+  <div id="root">
+    <h1>Apply — Frontend Engineer</h1>
+
+    <form class="application">
+      <label for="rc-email">Email address</label>
+      <input id="rc-email" type="email" autocomplete="email" aria-label="Email address" />
+
+      <label for="rc-gated">Full name</label>
+      <input id="rc-gated" type="text" aria-label="Full name" />
+
+      <label for="rc-hostile">GitHub profile</label>
+      <input id="rc-hostile" type="url" aria-label="GitHub profile" />
+
+      <button type="submit">Submit application</button>
+    </form>
+  </div>
+
+  <script>
+    /*
+     * Synthetic React-style controlled inputs.
+     *
+     * - `state` is the framework's source of truth; a scheduled render writes
+     *   it back to the DOM, so any value that did not reach `state`
+     *   "disappears after a render".
+     * - Writes through the instance `value` property update the tracker, the
+     *   same way React's value tracker swallows duplicate change events; only
+     *   writes that bypass it (prototype setter) commit state.
+     * - `rc-gated` drops its first input event to simulate an event that
+     *   arrives while the component is still mounting.
+     * - `rc-hostile` rejects every write and always re-renders empty.
+     */
+    (function () {
+      var proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      var registry = [];
+      var states = {};
+
+      window.__rcStates = states;
+
+      function renderAll() {
+        setTimeout(function () {
+          registry.forEach(function (entry) {
+            proto.set.call(entry.el, entry.state);
+          });
+        }, 0);
+      }
+
+      function makeControlled(el, options) {
+        options = options || {};
+        var tracked = '';
+        var state = '';
+        var armed = !options.dropFirstEvent;
+
+        el._valueTracker = {
+          getValue: function () { return tracked; },
+          setValue: function (value) { tracked = String(value); },
+        };
+
+        Object.defineProperty(el, 'value', {
+          configurable: true,
+          get: function () { return proto.get.call(this); },
+          set: function (value) { tracked = String(value); proto.set.call(this, value); },
+        });
+
+        var entry = { el: el, state: state };
+        registry.push(entry);
+
+        el.addEventListener('input', function () {
+          if (options.rejectAll) {
+            renderAll();
+            return;
+          }
+          var actual = proto.get.call(el);
+          if (!armed) {
+            armed = true;
+            renderAll();
+            return;
+          }
+          if (actual !== tracked) {
+            state = actual;
+            entry.state = state;
+            tracked = actual;
+            states[el.id] = state;
+          }
+          renderAll();
+        });
+
+        states[el.id] = '';
+        return entry;
+      }
+
+      makeControlled(document.getElementById('rc-email'), {});
+      makeControlled(document.getElementById('rc-gated'), { dropFirstEvent: true });
+      makeControlled(document.getElementById('rc-hostile'), { rejectAll: true });
+    })();
+  </script>
+</body>
+</html>
