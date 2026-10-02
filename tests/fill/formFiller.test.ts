@@ -88,7 +88,7 @@ describe('executeFillPlan on simple.html', () => {
 
   it('fills auto-fill fields and marks review fields', async () => {
     const plan = await planFor(makeProfile());
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
 
     expect(result.failedCount).toBe(0);
     expect(result.success).toBe(true);
@@ -104,7 +104,7 @@ describe('executeFillPlan on simple.html', () => {
 
     const recordFor = (semanticField: string) =>
       result.fields.find((f) => f.semanticField === semanticField);
-    expect(recordFor('email')?.status).toBe('success');
+    expect(recordFor('email')?.status).toBe('filled');
     expect(recordFor('full_name')?.status).toBe('needs_review');
     expect(recordFor('terms_acceptance')?.status).toBe('skipped');
     expect(recordFor('authorized_to_work')?.status).toBe('needs_review');
@@ -112,7 +112,7 @@ describe('executeFillPlan on simple.html', () => {
 
   it('does not touch sensitive or pending fields', async () => {
     const plan = await planFor(makeProfile());
-    executeFillPlan(plan);
+    await executeFillPlan(plan);
 
     const terms = inputByLabel('terms') as HTMLInputElement;
     expect(terms.checked).toBe(false);
@@ -128,14 +128,14 @@ describe('executeFillPlan on simple.html', () => {
     const listener = vi.fn();
     email.addEventListener('input', listener);
 
-    executeFillPlan(plan);
+    await executeFillPlan(plan);
     expect(listener).toHaveBeenCalled();
   });
 
   it('reports a failed upload when no resume file is configured', async () => {
     const settings: AutofillSettings = { ...DEFAULT_AUTOFILL_SETTINGS, autoUploadResume: true };
     const plan = await planFor(makeProfile(), settings);
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
 
     const resume = result.fields.find((f) => f.semanticField === 'resume');
     expect(resume?.status).toBe('failed');
@@ -149,7 +149,7 @@ describe('executeFillPlan on simple.html', () => {
     document.body.innerHTML = '';
     refreshRegistry();
 
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
     expect(result.failedCount).toBeGreaterThan(0);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.success).toBe(false);
@@ -157,7 +157,7 @@ describe('executeFillPlan on simple.html', () => {
 
   it('counts every planned action exactly once', async () => {
     const plan = await planFor(makeProfile());
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
 
     expect(result.fields.length).toBe(plan.actions.length);
     expect(
@@ -182,7 +182,7 @@ describe('executeFillPlan on lever-like.html', () => {
       },
     ];
     const plan = await planFor(profile);
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
 
     const select = inputByLabel('hear') as HTMLSelectElement;
     expect(select.value).toBe('Referral');
@@ -209,7 +209,7 @@ describe('executeFillPlan radio groups', () => {
 
   it('checks only the matching radio option', async () => {
     const plan = await planFor(makeProfile());
-    const result = executeFillPlan(plan);
+    const result = await executeFillPlan(plan);
 
     const remote = document.querySelector<HTMLInputElement>('input[value="remote"]');
     const office = document.querySelector<HTMLInputElement>('input[value="office"]');
@@ -230,9 +230,9 @@ describe('applyUserEdit', () => {
     const action = plan.actions.find((a) => a.semanticField === 'why_company');
     expect(action).toBeDefined();
 
-    const record = applyUserEdit(action!, 'I admire Acme’s tooling focus.');
+    const record = await applyUserEdit(action!, 'I admire Acme’s tooling focus.');
 
-    expect(record.status).toBe('success');
+    expect(record.status).toBe('filled');
     expect(record.method).toBe('user');
     expect(record.value).toBe('I admire Acme’s tooling focus.');
 
@@ -247,7 +247,7 @@ describe('applyUserEdit', () => {
     document.body.innerHTML = '';
     refreshRegistry();
 
-    const record = applyUserEdit(action!, 'anything');
+    const record = await applyUserEdit(action!, 'anything');
     expect(record.status).toBe('failed');
     expect(record.error).toContain('not found');
   });
@@ -258,7 +258,7 @@ describe('clearFillMarks', () => {
 
   it('removes highlight and pending markers', async () => {
     const plan = await planFor(makeProfile());
-    executeFillPlan(plan);
+    await executeFillPlan(plan);
     expect(document.querySelector('[data-ua-highlight]')).toBeTruthy();
 
     clearFillMarks();
