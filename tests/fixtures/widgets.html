@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Application — Widget-heavy ATS</title>
+</head>
+<body>
+  <h1>Apply — Platform Engineer</h1>
+
+  <form class="ats-form">
+    <div class="field">
+      <span id="w-summary-label">Professional summary</span>
+      <div
+        id="w-summary"
+        class="editor"
+        contenteditable="true"
+        role="textbox"
+        aria-labelledby="w-summary-label"
+        aria-multiline="true"
+      ></div>
+    </div>
+
+    <div class="field">
+      <span id="w-country-label">Country/Region</span>
+      <div
+        id="w-country"
+        role="combobox"
+        tabindex="0"
+        aria-label="Country/Region"
+        aria-controls="w-country-list"
+        aria-expanded="false"
+        class="combo-trigger"
+      >
+        <span class="combo-value">Country/Region</span>
+      </div>
+      <ul id="w-country-list" role="listbox" hidden>
+        <li role="option" data-value="IN">India</li>
+        <li role="option" data-value="US">United States</li>
+        <li role="option" data-value="GB">United Kingdom</li>
+        <li role="option" data-value="DE">Germany</li>
+      </ul>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" id="w-remote" name="remote_ok" />
+      Remote work
+    </label>
+
+    <label class="check">
+      <input type="checkbox" id="w-certify" name="certify" />
+      I certify that all information provided is accurate and complete.
+    </label>
+
+    <button type="submit">Send application</button>
+  </form>
+
+  <script>
+    (function () {
+      var trigger = document.getElementById('w-country');
+      var list = document.getElementById('w-country-list');
+
+      trigger.addEventListener('click', function () {
+        var open = list.hasAttribute('hidden');
+        if (open) list.removeAttribute('hidden');
+        else list.setAttribute('hidden', '');
+        trigger.setAttribute('aria-expanded', String(open));
+      });
+
+      list.addEventListener('click', function (event) {
+        var option = event.target && event.target.closest
+          ? event.target.closest('[role="option"]')
+          : null;
+        if (!option) return;
+        trigger.querySelector('.combo-value').textContent = option.textContent;
+        trigger.textContent = option.textContent;
+        list.setAttribute('hidden', '');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    })();
+  </script>
+</body>
+</html>
