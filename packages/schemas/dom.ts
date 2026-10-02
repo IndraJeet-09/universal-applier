@@ -48,6 +48,8 @@ export interface FormAnalysis {
   pageConfidence?: number;
   pageReasons?: string[];
   jobContext?: JobContext;
+  /** A CAPTCHA challenge is present — the user must solve it manually. */
+  captchaDetected?: boolean;
   sections: FormSection[];
   totalFields: number;
   fillableFields: number;
