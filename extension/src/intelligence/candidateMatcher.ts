@@ -360,6 +360,42 @@ function degreeLevelOf(text: string): string | null {
   return null;
 }
 
+const DEGREE_STOPWORDS = new Set(['of', 'in', 'and', 'the', 'a', 'an', 'or', 'with']);
+
+const DEGREE_EXPANSIONS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /\bbtech\b|\bb\s+tech\b/, replacement: 'bachelor technology' },
+  { pattern: /\bmtech\b|\bm\s+tech\b/, replacement: 'master technology' },
+  { pattern: /\bbsc\b|\bb\s+sc\b/, replacement: 'bachelor science' },
+  { pattern: /\bmsc\b|\bm\s+sc\b/, replacement: 'master science' },
+  { pattern: /\bbe\b|\bb\s+e\b/, replacement: 'bachelor engineering' },
+  { pattern: /\bms\b|\bm\s+s\b/, replacement: 'master science' },
+  { pattern: /\bbachelor\s+of\b/, replacement: 'bachelor' },
+  { pattern: /\bmaster\s+of\b/, replacement: 'master' },
+];
+
+/**
+ * Words that describe the degree itself, so "B.Tech" and
+ * "Bachelor of Technology" produce the same signature.
+ */
+function degreeSignature(text: string): Set<string> {
+  let normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const { pattern, replacement } of DEGREE_EXPANSIONS) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+  return new Set(
+    normalized.split(/\s+/).filter((word) => word.length > 1 && !DEGREE_STOPWORDS.has(word))
+  );
+}
+
+function signatureOverlap(a: string, b: string): number {
+  const left = degreeSignature(a);
+  const right = degreeSignature(b);
+  let intersection = 0;
+  for (const word of left) if (right.has(word)) intersection += 1;
+  const union = left.size + right.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
 /**
  * Match a candidate value against the options actually offered by the page.
  * Priority: exact → answer meaning (yes/no) → academic level → numeric range
@@ -385,15 +421,12 @@ export function matchOption(options: string[], desired: string): string | null {
     const candidates = options.filter((o) => degreeLevelOf(o) === desiredLevel);
     if (candidates.length === 1) return candidates[0];
     if (candidates.length > 1) {
-      const tokensDesiredLevel = tokens(desired);
-      let bestLevel: { option: string; score: number } | null = null;
+      let best: { option: string; score: number } | null = null;
       for (const option of candidates) {
-        const score = jaccard(tokensDesiredLevel, tokens(option));
-        if (score > 0 && (!bestLevel || score > bestLevel.score)) {
-          bestLevel = { option, score };
-        }
+        const score = signatureOverlap(desired, option);
+        if (score > 0 && (!best || score > best.score)) best = { option, score };
       }
-      return bestLevel ? bestLevel.option : candidates[0];
+      return best ? best.option : candidates[0];
     }
   }
 
