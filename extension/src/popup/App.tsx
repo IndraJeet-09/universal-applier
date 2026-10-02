@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { flattenSkills, type CandidateProfile } from '@schemas/candidate';
 import type { FormAnalysis } from '@schemas/dom';
-import type { AutofillSettings, AutofillResult } from '@schemas/application';
+import type { AutofillSettings } from '@schemas/application';
 import { DEFAULT_AUTOFILL_SETTINGS } from '@schemas/application';
+import type { FillPlanSummary } from '../intelligence/fillPlanner';
 import { sendMessage, getActiveTab } from '../utils/messaging';
 
 interface PageStatus {
@@ -18,7 +19,7 @@ export default function App() {
   const [pageStatus, setPageStatus] = useState<PageStatus>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fillResult, setFillResult] = useState<AutofillResult | null>(null);
+  const [planSummary, setPlanSummary] = useState<FillPlanSummary | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -47,6 +48,16 @@ export default function App() {
               { tabId: tab.id }
             );
             setPageStatus((s) => ({ ...s, analysis }));
+            try {
+              const plan = await sendMessage<void, { summary: FillPlanSummary } | null>(
+                'get-last-plan',
+                undefined,
+                { tabId: tab.id }
+              );
+              if (plan) setPlanSummary(plan.summary);
+            } catch {
+              /* no plan built yet */
+            }
           }
         }
       } catch (e) {
@@ -58,11 +69,10 @@ export default function App() {
     })();
   }, []);
 
-  const analyzeAndFill = useCallback(async () => {
+  const analyze = useCallback(async () => {
     if (!pageStatus.tabId) return;
     setBusy(true);
     setError(null);
-    setFillResult(null);
     try {
       const analysis = await sendMessage<void, FormAnalysis>(
         'analyze-form',
@@ -70,16 +80,12 @@ export default function App() {
         { tabId: pageStatus.tabId }
       );
       setPageStatus((s) => ({ ...s, analysis }));
-
-      await sendMessage<void, unknown>('build-fill-plan', undefined, {
-        tabId: pageStatus.tabId,
-      });
-      const result = await sendMessage<void, AutofillResult>(
-        'execute-fill',
+      const plan = await sendMessage<void, { summary: FillPlanSummary }>(
+        'build-fill-plan',
         undefined,
         { tabId: pageStatus.tabId }
       );
-      setFillResult(result);
+      setPlanSummary(plan.summary);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -87,11 +93,19 @@ export default function App() {
     }
   }, [pageStatus.tabId]);
 
+  const openReview = useCallback(() => {
+    if (!pageStatus.tabId) return;
+    void sendMessage('show-summary-panel', undefined, { tabId: pageStatus.tabId }).catch((e) =>
+      setError(e instanceof Error ? e.message : String(e))
+    );
+  }, [pageStatus.tabId]);
+
   const tabId = pageStatus.tabId;
   const hasResume = Boolean(profile?.personal?.fullName);
   const topSkills = flattenSkills(profile?.skills).slice(0, 8);
   const analysis = pageStatus.analysis;
   const job = analysis?.jobContext;
+  const captcha = analysis?.captchaDetected;
 
   return (
     <div className="w-80 bg-white text-gray-900 text-sm">
@@ -155,6 +169,12 @@ export default function App() {
           </div>
         )}
 
+        {captcha && (
+          <div className="rounded-md bg-amber-50 border border-amber-300 text-amber-800 px-3 py-2 text-xs">
+            CAPTCHA detected. Please complete it manually.
+          </div>
+        )}
+
         <div className="text-gray-600 text-xs">
           {analysis
             ? `${analysis.totalFields} fields detected · ${analysis.fillableFields} fillable`
@@ -163,55 +183,45 @@ export default function App() {
               : 'Page not analyzed yet'}
         </div>
 
-        <button
-          onClick={() => void analyzeAndFill()}
-          disabled={busy || !hasResume || !pageStatus.tabId}
-          className="w-full rounded-md bg-blue-600 text-white py-2 font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {busy ? 'Analyzing…' : 'Analyze & Autofill'}
-        </button>
-
-        {fillResult && (
-          <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 text-xs space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Filled</span>
-              <span className="font-medium text-green-700">{fillResult.filledCount}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Needs review</span>
-              <span className="font-medium text-amber-600">{fillResult.needsReviewCount}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Skipped</span>
-              <span className="font-medium">{fillResult.skippedCount}</span>
-            </div>
-            {fillResult.failedCount > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Failed</span>
-                <span className="font-medium text-red-600">{fillResult.failedCount}</span>
-              </div>
+        {!planSummary ? (
+          <button
+            onClick={() => void analyze()}
+            disabled={busy || !hasResume || !tabId}
+            className="w-full rounded-md bg-blue-600 text-white py-2 font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? 'Analyzing…' : 'Autofill'}
+          </button>
+        ) : (
+          <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2 space-y-1.5">
+            <div className="font-semibold">Application Detected</div>
+            <div className="text-gray-700">{planSummary.total} fields</div>
+            <div className="text-green-700">✓ {planSummary.autoFill} confident</div>
+            <div className="text-amber-600">⚠ {planSummary.fillHighlight} uncertain</div>
+            <div className="text-blue-700">? {planSummary.askUser} need input</div>
+            {planSummary.skip > 0 && (
+              <div className="text-gray-500">– {planSummary.skip} skipped</div>
             )}
-            {fillResult.errors.length > 0 && (
-              <ul className="text-red-600 list-disc pl-4 space-y-0.5">
-                {fillResult.errors.slice(0, 3).map((err) => (
-                  <li key={err}>{err}</li>
-                ))}
-              </ul>
-            )}
-            {fillResult.needsReviewCount > 0 && tabId != null && (
+            <button
+              onClick={openReview}
+              className="w-full mt-1 rounded-md bg-blue-600 text-white py-2 font-medium hover:bg-blue-700"
+            >
+              Review &amp; Fill
+            </button>
+            <div className="flex gap-2">
               <button
-                onClick={() =>
-                  void sendMessage(
-                    'show-review-panel',
-                    undefined,
-                    { tabId }
-                  ).catch((e) => setError(e instanceof Error ? e.message : String(e)))
-                }
-                className="w-full mt-1 rounded-md bg-amber-500 text-white py-1.5 font-medium hover:bg-amber-600"
+                onClick={() => void analyze()}
+                disabled={busy}
+                className="flex-1 rounded-md bg-white border border-gray-300 text-gray-700 py-1.5 text-xs hover:bg-gray-100 disabled:opacity-50"
               >
-                Review {fillResult.needsReviewCount} fields in page
+                {busy ? 'Rescanning…' : 'Rescan'}
               </button>
-            )}
+              <button
+                onClick={() => setPlanSummary(null)}
+                className="flex-1 rounded-md bg-white border border-gray-300 text-gray-700 py-1.5 text-xs hover:bg-gray-100"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
