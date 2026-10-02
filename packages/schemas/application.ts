@@ -18,9 +18,13 @@ export interface FilledField {
   value: string;
   confidence: number;
   method: 'deterministic' | 'synonym' | 'heuristic' | 'ai' | 'cache' | 'user';
-  status: 'success' | 'failed' | 'skipped' | 'needs_review';
+  /** `filled` is only recorded after the value has been read back from the DOM. */
+  status: 'filled' | 'failed' | 'skipped' | 'needs_review';
   timestamp: string;
   error?: string;
+  reason?: string;
+  /** How many write strategies were attempted before the fill was accepted. */
+  attempts?: number;
 }
 
 export interface AutofillResult {
@@ -33,13 +37,19 @@ export interface AutofillResult {
   errors: string[];
 }
 
+/**
+ * Semantic field → candidate profile mapping produced between the candidate
+ * matcher and the form filler. This is the object the review UI inspects
+ * before anything is written to the page.
+ */
 export interface FieldMapping {
   fieldId: string;
   semanticField: string;
-  candidateValue: string;
+  candidatePath?: string;
+  value?: string;
   confidence: number;
-  source: 'profile' | 'saved_answer' | 'ai_generated' | 'user_input';
-  profilePath?: string;
+  source?: string;
+  status: 'matched' | 'needs_review' | 'skipped' | 'failed';
 }
 
 export interface ReviewItem {
